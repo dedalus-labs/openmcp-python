@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
 
 from ..._sdk_loader import ensure_sdk_importable
+from .base import BaseTransport
 
 ensure_sdk_importable()
 
@@ -20,11 +21,17 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle guard
     from ..app import MCPServer
 
 
-class StreamableHTTPTransport:
+class StreamableHTTPTransport(BaseTransport):
     """Serve an :class:`openmcp.server.app.MCPServer` over Streamable HTTP."""
 
-    def __init__(self, server: "MCPServer") -> None:
-        self._server = server
+    def __init__(
+        self,
+        server: "MCPServer",
+        *,
+        security_settings: "TransportSecuritySettings | None" = None,
+    ) -> None:
+        super().__init__(server)
+        self._security_settings = security_settings
 
     async def run(
         self,
@@ -70,8 +77,13 @@ class StreamableHTTPTransport:
             ) from exc
 
         from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+        from mcp.server.transport_security import TransportSecuritySettings
 
-        manager = StreamableHTTPSessionManager(self._server)
+        security = self._security_settings
+        if security is not None and not isinstance(security, TransportSecuritySettings):
+            security = TransportSecuritySettings.model_validate(security)
+
+        manager = StreamableHTTPSessionManager(self.server, security_settings=security)
 
         class StreamableHTTPApp:
             def __init__(self, session_manager: StreamableHTTPSessionManager) -> None:

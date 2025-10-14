@@ -11,12 +11,13 @@ Spec receipts covered here:
 
 from __future__ import annotations
 
-import base64
 from typing import Any, Callable, Iterable
 
+from ...context import context_scope
 from ...resource import ResourceSpec, extract_resource_spec
 from ...resource_template import ResourceTemplateSpec, extract_resource_template_spec
 from ... import types
+from ..adapters import normalize_resource_payload
 from ..notifications import NotificationSink, ObserverRegistry
 from ..pagination import paginate_sequence
 from ..subscriptions import SubscriptionManager
@@ -93,42 +94,24 @@ class ResourcesService:
             return types.ReadResourceResult(contents=[])
 
         try:
-            data = spec.fn()
+            try:
+                with context_scope():
+                    data = spec.fn()
+            except LookupError:
+                data = spec.fn()
         except Exception as exc:  # pragma: no cover - defensive
             text = f"Resource error: {exc}"
             return types.ReadResourceResult(
                 contents=[
                     types.TextResourceContents(
                         uri=uri,
-                        name=spec.name or uri,
-                        text=text,
                         mimeType="text/plain",
+                        text=text,
                     )
                 ]
             )
 
-        if isinstance(data, bytes):
-            return types.ReadResourceResult(
-                contents=[
-                    types.BlobResourceContents(
-                        uri=uri,
-                        name=spec.name or uri,
-                        blob=base64.b64encode(data).decode(),
-                        mimeType=spec.mime_type or "application/octet-stream",
-                    )
-                ]
-            )
-
-        return types.ReadResourceResult(
-            contents=[
-                types.TextResourceContents(
-                    uri=uri,
-                    name=spec.name or uri,
-                    text=str(data),
-                    mimeType=spec.mime_type or "text/plain",
-                )
-            ]
-        )
+        return normalize_resource_payload(uri, spec.mime_type, data)
 
     # ------------------------------------------------------------------
     # Subscriptions

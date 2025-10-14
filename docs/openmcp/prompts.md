@@ -31,3 +31,5 @@ result = await server.invoke_prompt("daily-standup", arguments={"name": "Ada"})
 - Spec receipts: `docs/mcp/spec/schema-reference/prompts-list.md`, `prompts-get.md`
 - Advertise `listChanged` by toggling `NotificationFlags.prompts_changed` and emitting notifications when your prompt registry changes.
 - Completions can target prompts directly using the `@completion(prompt=...)` decorator; see the companion document.
+- Prompt renderers executed during an MCP request can call `get_context()` to
+  log or stream progress (e.g. when generating resource-heavy prompt content).

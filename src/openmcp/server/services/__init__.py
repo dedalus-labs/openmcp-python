@@ -7,6 +7,8 @@ from .completions import CompletionService
 from .logging import LoggingService
 from .roots import RootsService, RootGuard
 from .sampling import SamplingService
+from .elicitation import ElicitationService
+from .ping import PingService
 
 __all__ = [
     "ToolsService",
@@ -17,4 +19,6 @@ __all__ = [
     "RootsService",
     "RootGuard",
     "SamplingService",
+    "ElicitationService",
+    "PingService",
 ]

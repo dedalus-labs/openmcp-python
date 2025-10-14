@@ -41,3 +41,5 @@ async def refresh_index() -> None:
 - Integration TODO: add transport-level tests (STDIO + Streamable HTTP) to
   assert notifications flow end-to-end under load (tracked in
   `tests/test_integration_subscriptions.py`).
+- Resource handlers can import `get_context()` to emit logs or progress while
+  serving the payload; see `docs/openmcp/context.md` for the helper API.

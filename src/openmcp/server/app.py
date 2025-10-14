@@ -6,10 +6,14 @@ from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import wraps
 import inspect
-from typing import Any, Literal
+from typing import Any, Literal, TYPE_CHECKING
 from collections.abc import Callable, Iterable, Mapping
 
+import anyio
+import anyio.abc
+
 from .._sdk_loader import ensure_sdk_importable
+from .transports.base import BaseTransport, TransportFactory
 
 ensure_sdk_importable()
 
@@ -22,6 +26,7 @@ from mcp.server.lowlevel.server import (
 )
 from mcp.server.models import InitializationOptions
 from mcp.shared.exceptions import McpError
+from mcp.shared.session import RequestResponder
 
 from ..completion import (
     CompletionSpec,
@@ -56,11 +61,17 @@ from .services import (
     ResourcesService,
     RootsService,
     SamplingService,
+    ElicitationService,
     ToolsService,
+    PingService,
 )
 from .subscriptions import SubscriptionManager
 from .notifications import DefaultNotificationSink, NotificationSink
 from .transports import StdioTransport, StreamableHTTPTransport
+from mcp.server.transport_security import TransportSecuritySettings
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.session import ServerSession
 
 TransportLiteral = Literal["stdio", "streamable-http"]
 
@@ -93,6 +104,7 @@ class MCPServer(Server[Any, Any]):
         lifespan: Callable[[Server[Any, Any]], Any] = default_lifespan,
         transport: str | None = None,
         notification_sink: NotificationSink | None = None,
+        http_security: TransportSecuritySettings | None = None,
     ) -> None:
         self._notification_flags = notification_flags or NotificationFlags()
         self._experimental_capabilities = {
@@ -137,6 +149,26 @@ class MCPServer(Server[Any, Any]):
             notification_sink=self._notification_sink,
         )
         self.sampling = SamplingService()
+        self.elicitation = ElicitationService()
+        self.ping = PingService(
+            notification_sink=self._notification_sink,
+            logger=self._logger,
+        )
+
+        self._http_security_settings = (
+            http_security if http_security is not None else self._default_http_security_settings()
+        )
+
+        self._transport_factories: dict[str, TransportFactory] = {}
+        self.register_transport("stdio", lambda server: StdioTransport(server))
+        stream_http_factory = lambda server: StreamableHTTPTransport(
+            server, security_settings=self._http_security_settings
+        )
+        self.register_transport(
+            "streamable-http",
+            stream_http_factory,
+            aliases=("streamable_http", "shttp", "http"),
+        )
 
         self.notification_handlers[types.InitializedNotification] = self._handle_initialized
         self.notification_handlers[types.RootsListChangedNotification] = self._handle_roots_list_changed
@@ -150,8 +182,8 @@ class MCPServer(Server[Any, Any]):
             return await self.resources.list_resources(request)
 
         @self.read_resource()
-        async def _read_resource(request: types.ReadResourceRequest) -> types.ReadResourceResult:
-            return await self.resources.read(request.params.uri)
+        async def _read_resource(uri: types.AnyUrl) -> types.ReadResourceResult:
+            return await self.resources.read(str(uri))
 
         @self.list_resource_templates()
         async def _list_templates(request: types.ListResourceTemplatesRequest) -> types.ListResourceTemplatesResult:
@@ -206,6 +238,73 @@ class MCPServer(Server[Any, Any]):
     def prompt_names(self) -> list[str]:
         return self.prompts.names
 
+    def active_sessions(self) -> tuple["ServerSession", ...]:
+        """Return a snapshot of currently tracked client sessions."""
+
+        return self.ping.active()
+
+    async def ping_client(
+        self,
+        session: "ServerSession",
+        *,
+        timeout: float | None = None,
+    ) -> bool:
+        """Send ``ping`` to a specific client session (docs/mcp/spec/schema-reference/ping.md)."""
+
+        return await self.ping.ping(session, timeout=timeout)
+
+    async def ping_clients(
+        self,
+        sessions: Iterable["ServerSession"] | None = None,
+        *,
+        timeout: float | None = None,
+        max_concurrency: int | None = None,
+    ) -> dict["ServerSession", bool]:
+        """Ping a set of client sessions, defaulting to all active connections."""
+
+        return await self.ping.ping_many(
+            sessions,
+            timeout=timeout,
+            max_concurrency=max_concurrency,
+        )
+
+    async def ping_current_session(self, *, timeout: float | None = None) -> bool:
+        """Convenience wrapper that pings the client associated with the active request."""
+
+        try:
+            context = request_ctx.get()
+        except LookupError as exc:  # pragma: no cover - defensive
+            raise RuntimeError("ping_current_session requires an active request context") from exc
+
+        return await self.ping_client(context.session, timeout=timeout)
+
+    async def _handle_message(self, message, session, lifespan_context, raise_exceptions: bool = False):
+        if isinstance(message, (RequestResponder, types.ClientNotification)):
+            self.ping.register(session)
+            self.ping.touch(session)
+        await super()._handle_message(message, session, lifespan_context, raise_exceptions)
+
+    def start_ping_heartbeat(
+        self,
+        task_group: anyio.abc.TaskGroup,
+        *,
+        interval: float = 5.0,
+        jitter: float = 0.2,
+        timeout: float = 2.0,
+        phi_threshold: float | None = None,
+        max_concurrency: int | None = None,
+    ) -> None:
+        """Launch a background heartbeat probe loop for all sessions."""
+
+        self.ping.start_heartbeat(
+            task_group,
+            interval=interval,
+            jitter=jitter,
+            timeout=timeout,
+            phi_threshold=phi_threshold,
+            max_concurrency=max_concurrency,
+        )
+
     def register_tool(self, target: ToolSpec | Callable[..., Any]) -> ToolSpec:
         return self.tools.register(target)
 
@@ -255,6 +354,13 @@ class MCPServer(Server[Any, Any]):
         """Proxy ``sampling/createMessage`` (docs/mcp/spec/schema-reference/sampling-createmessage.md)."""
 
         return await self.sampling.create_message(params)
+
+    async def request_elicitation(
+        self, params: types.ElicitRequestParams
+    ) -> types.ElicitResult:
+        """Proxy ``elicitation/create`` (docs/mcp/spec/schema-reference/elicitation-create.md)."""
+
+        return await self.elicitation.create(params)
 
     async def list_resource_templates_paginated(
         self,
@@ -344,6 +450,7 @@ class MCPServer(Server[Any, Any]):
             context = request_ctx.get()
         except LookupError:  # pragma: no cover - defensive
             return
+        self.ping.register(context.session)
         await self.roots.on_session_open(context.session)
 
     async def _handle_roots_list_changed(self, _notification: types.RootsListChangedNotification) -> None:
@@ -412,6 +519,51 @@ class MCPServer(Server[Any, Any]):
             reset_completion_server(completion_token)
             reset_prompt_server(prompt_token)
             reset_resource_template_server(template_token)
+
+    # //////////////////////////////////////////////////////////////////
+    # Transport registry
+    # //////////////////////////////////////////////////////////////////
+
+    @staticmethod
+    def _default_http_security_settings() -> TransportSecuritySettings:
+        """Return conservative defaults for streamable HTTP security."""
+
+        return TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=["127.0.0.1:*", "localhost:*"],
+            allowed_origins=["https://as.dedaluslabs.ai"],
+        )
+
+    def register_transport(
+        self,
+        name: str,
+        factory: TransportFactory,
+        *,
+        aliases: Iterable[str] | None = None,
+    ) -> None:
+        canonical = name.lower()
+        self._transport_factories[canonical] = factory
+        for alias in aliases or ():
+            self._transport_factories[alias.lower()] = factory
+
+    def _transport_for_name(self, name: str) -> BaseTransport:
+        factory = self._transport_factories.get(name)
+        if factory is None:
+            raise ValueError(f"Unsupported transport '{name}'.")
+        transport = factory(self)
+        if not isinstance(transport, BaseTransport):  # pragma: no cover - defensive
+            raise TypeError("Transport factory must return a BaseTransport instance")
+        return transport
+
+    def configure_streamable_http_security(
+        self, settings: TransportSecuritySettings | None
+    ) -> None:
+        """Update the security guard used by the Streamable HTTP transport."""
+
+        self._http_security_settings = (
+            settings if settings is not None else self._default_http_security_settings()
+        )
+
     # //////////////////////////////////////////////////////////////////
     # Transport helpers
     # //////////////////////////////////////////////////////////////////
@@ -422,7 +574,7 @@ class MCPServer(Server[Any, Any]):
         raise_exceptions: bool = False,
         stateless: bool = False,
     ) -> None:
-        transport = StdioTransport(self)
+        transport = self._transport_for_name("stdio")
         await transport.run(raise_exceptions=raise_exceptions, stateless=stateless)
 
     async def serve(
@@ -431,12 +583,15 @@ class MCPServer(Server[Any, Any]):
         transport: str | None = None,
         **kwargs: Any,
     ) -> None:
-        selected = transport.lower() if transport else self._default_transport
-        if selected == "stdio":
-            return await self.serve_stdio(**kwargs)
-        if selected in {"http", "shttp", "streamable-http", "streamable_http"}:
-            return await self.serve_streamable_http(**kwargs)
-        raise ValueError(f"Unsupported transport '{selected}'.")
+        selected = (transport or self._default_transport).lower()
+        if selected in {"stdio", "streamable-http", "streamable_http", "http", "shttp"}:
+            if selected == "stdio":
+                await self.serve_stdio(**kwargs)
+                return
+            await self.serve_streamable_http(**kwargs)
+            return
+        transport_instance = self._transport_for_name(selected)
+        await transport_instance.run(**kwargs)
 
     async def serve_streamable_http(
         self,
@@ -446,7 +601,7 @@ class MCPServer(Server[Any, Any]):
         log_level: str = "info",
         **uvicorn_options: Any,
     ) -> None:
-        transport = StreamableHTTPTransport(self)
+        transport = self._transport_for_name("streamable-http")
         await transport.run(
             host=host,
             port=port,

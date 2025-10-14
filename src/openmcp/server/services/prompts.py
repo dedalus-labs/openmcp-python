@@ -14,6 +14,7 @@ from typing import Any, Callable, Iterable
 
 from mcp.shared.exceptions import McpError
 
+from ...context import context_scope
 from ...prompt import PromptSpec, extract_prompt_spec
 from ... import types
 from ...utils import maybe_await_with_args
@@ -78,10 +79,20 @@ class PromptsService:
                 )
             )
 
-        rendered = await maybe_await_with_args(
-            spec.fn,
-            provided if spec.arguments else provided,
-        )  # type: ignore[arg-type]
+        try:
+            try:
+                with context_scope():
+                    rendered = await maybe_await_with_args(
+                        spec.fn,
+                        provided if spec.arguments else provided,
+                    )  # type: ignore[arg-type]
+            except LookupError:
+                rendered = await maybe_await_with_args(
+                    spec.fn,
+                    provided if spec.arguments else provided,
+                )  # type: ignore[arg-type]
+        except TypeError as exc:
+            raise TypeError(str(exc)) from exc
 
         return self._coerce_prompt_result(spec, rendered)
 

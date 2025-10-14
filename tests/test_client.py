@@ -162,6 +162,12 @@ async def test_sampling_and_elicitation_handlers_wrapped(monkeypatch: pytest.Mon
         result = await session.sampling_callback(ctx, params)
         assert isinstance(result, types.CreateMessageResult)
 
-        elicit_params = types.ElicitRequestParams(message="", requestedSchema={})
+        elicit_params = types.ElicitRequestParams(
+            message="Provide",
+            requestedSchema={
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+            },
+        )
         elicit_result = await session.elicitation_callback(ctx, elicit_params)
         assert isinstance(elicit_result, types.ElicitResult)

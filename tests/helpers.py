@@ -46,12 +46,44 @@ class FailingSession(DummySession):
         raise RuntimeError("notification failure")
 
 
-async def run_with_context(session: DummySession, func, *args):
-    """Execute *func* with ``request_ctx`` bound to *session*."""
+class RecordingSession(DummySession):
+    """Session used to capture log and progress traffic during tests."""
 
+    def __init__(self, name: str = "recording") -> None:
+        super().__init__(name)
+        self.log_messages: list[tuple[str | None, dict[str, object], str | None]] = []
+        self.progress_events: list[dict[str, object | None]] = []
+
+    async def send_log_message(self, level, data, logger=None):
+        await anyio.lowlevel.checkpoint()
+        self.log_messages.append((level, dict(data), logger))
+
+    async def send_progress_notification(
+        self,
+        progress_token,
+        progress,
+        *,
+        total=None,
+        message=None,
+        related_request_id=None,
+    ):
+        await anyio.lowlevel.checkpoint()
+        self.progress_events.append(
+            {
+                "token": progress_token,
+                "progress": progress,
+                "total": total,
+                "message": message,
+                "related_request_id": related_request_id,
+            }
+        )
+
+
+async def run_with_context(session: DummySession, func, *args, meta=None):
+    """Execute *func* with ``request_ctx`` bound to *session*."""
     ctx = RequestContext(
         request_id=next(_REQUEST_COUNTER),
-        meta=None,
+        meta=meta,
         session=session,  # type: ignore[arg-type]
         lifespan_context={},
     )

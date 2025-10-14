@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..._sdk_loader import ensure_sdk_importable
+from .base import BaseTransport
 
 ensure_sdk_importable()
 
@@ -28,18 +29,15 @@ def get_stdio_server():
     return stdio_server
 
 
-class StdioTransport:
+class StdioTransport(BaseTransport):
     """Run an :class:`openmcp.server.app.MCPServer` over STDIO."""
-
-    def __init__(self, server: "MCPServer") -> None:
-        self._server = server
 
     async def run(self, *, raise_exceptions: bool = False, stateless: bool = False) -> None:
         stdio_ctx = get_stdio_server()
-        init_options = self._server.create_initialization_options()
+        init_options = self.server.create_initialization_options()
 
         async with stdio_ctx() as (read_stream, write_stream):
-            await self._server.run(
+            await self.server.run(
                 read_stream,
                 write_stream,
                 init_options,

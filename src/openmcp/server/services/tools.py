@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import inspect
-import json
 import types as pytypes
 from typing import Any, Callable, Iterable, NotRequired, TypedDict
 
 from pydantic import TypeAdapter
 
+from ...context import context_scope
+from ..adapters import normalize_tool_result
 from ...tool import ToolSpec, extract_tool_spec
 from ... import types
 from ...utils import maybe_await_with_args
@@ -80,32 +81,23 @@ class ToolsService:
             )
 
         try:
-            result = await maybe_await_with_args(spec.fn, **arguments)
+            try:
+                with context_scope():
+                    result = await maybe_await_with_args(spec.fn, **arguments)
+            except LookupError:
+                result = await maybe_await_with_args(spec.fn, **arguments)
         except TypeError as exc:  # argument mismatch
             return types.CallToolResult(
                 content=[types.TextContent(type="text", text=f"Invalid arguments: {exc}")],
                 isError=True,
             )
 
-        if isinstance(result, types.CallToolResult):
-            return result
-
         if isinstance(result, types.ServerResult):
             raise RuntimeError(
                 "Tool returned types.ServerResult; return the nested CallToolResult instead."
             )
 
-        if isinstance(result, str):
-            text = result
-        else:
-            try:
-                text = json.dumps(result, ensure_ascii=False)
-            except Exception:
-                text = str(result)
-
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=text)],
-        )
+        return normalize_tool_result(result)
 
     async def notify_list_changed(self) -> None:
         notification = types.ServerNotification(types.ToolListChangedNotification(params=None))
@@ -140,7 +132,7 @@ class ToolsService:
                 name=spec.name,
                 description=spec.description or None,
                 inputSchema=spec.input_schema or self._build_input_schema(spec.fn),
-                outputSchema=spec.output_schema or {"type": "object", "additionalProperties": True},
+                outputSchema=spec.output_schema,
                 annotations=annotations,
                 icons=icons,
             )
