@@ -1,0 +1,48 @@
+"""STDIO transport adapter built on the reference MCP SDK.
+
+Implements the framing rules from ``docs/mcp/core/transports/stdio.md`` by
+delegating to the SDK's ``stdio_server`` helper, which handles newline-delimited
+JSON-RPC traffic over ``stdin``/``stdout``.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from ..._sdk_loader import ensure_sdk_importable
+
+ensure_sdk_importable()
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard
+    from ..app import MCPServer
+
+
+def get_stdio_server():
+    """Return the SDK's stdio context manager.
+
+    Separated into a helper so tests can patch it with in-memory transports.
+    """
+
+    from mcp.server.stdio import stdio_server
+
+    return stdio_server
+
+
+class StdioTransport:
+    """Run an :class:`openmcp.server.app.MCPServer` over STDIO."""
+
+    def __init__(self, server: "MCPServer") -> None:
+        self._server = server
+
+    async def run(self, *, raise_exceptions: bool = False, stateless: bool = False) -> None:
+        stdio_ctx = get_stdio_server()
+        init_options = self._server.create_initialization_options()
+
+        async with stdio_ctx() as (read_stream, write_stream):
+            await self._server.run(
+                read_stream,
+                write_stream,
+                init_options,
+                raise_exceptions=raise_exceptions,
+                stateless=stateless,
+            )

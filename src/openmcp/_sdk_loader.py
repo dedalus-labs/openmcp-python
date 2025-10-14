@@ -28,18 +28,24 @@ def ensure_sdk_importable() -> None:
 
     try:
         import_module("mcp")
-        return
     except ModuleNotFoundError:
-        pass
+        if _SDK_RELATIVE_PATH.is_dir():
+            sys.path.append(str(_SDK_RELATIVE_PATH))
+            import_module("mcp")
+        else:
+            raise ModuleNotFoundError(
+                "Could not locate the reference MCP SDK. The directory"
+                f" {_SDK_RELATIVE_PATH} is missing."
+            )
 
-    if _SDK_RELATIVE_PATH.is_dir():
-        sys.path.append(str(_SDK_RELATIVE_PATH))
-        import_module("mcp")
-    else:
-        raise ModuleNotFoundError(
-            "Could not locate the reference MCP SDK. The directory"
-            f" {_SDK_RELATIVE_PATH} is missing."
-        )
+    # Align the reference SDK's protocol support with OpenMCP.  We currently
+    # implement the latest revision of the specification (2025-06-18) and make
+    # that explicit so the upstream negotiation logic does not advertise
+    # unsupported versions.
+    from mcp.types import LATEST_PROTOCOL_VERSION
+    from mcp.shared import version as shared_version
+
+    shared_version.SUPPORTED_PROTOCOL_VERSIONS[:] = [LATEST_PROTOCOL_VERSION]
 
 
 __all__ = ["ensure_sdk_importable"]

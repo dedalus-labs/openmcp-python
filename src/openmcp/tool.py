@@ -46,6 +46,10 @@ class ToolSpec:
     tags: set[str] = field(default_factory=set)
     input_schema: dict[str, Any] | None = None
     enabled: Callable[["MCPServer"], bool] | None = None
+    title: str | None = None
+    output_schema: dict[str, Any] | None = None
+    annotations: dict[str, Any] | None = None
+    icons: list[Any] | None = None
 
 
 _TOOL_ATTR = "__openmcp_tool__"
@@ -78,6 +82,10 @@ def tool(
     tags: Iterable[str] | None = None,
     input_schema: dict[str, Any] | None = None,
     enabled: Callable[["MCPServer"], bool] | None = None,
+    title: str | None = None,
+    output_schema: dict[str, Any] | None = None,
+    annotations: dict[str, Any] | None = None,
+    icons: Iterable[Any] | None = None,
 ) -> Callable[[ToolFn], ToolFn]:
     """Decorator that marks a callable as an MCP tool.
 
@@ -95,6 +103,10 @@ def tool(
             tags=_coerce_tags(tags),
             input_schema=input_schema,
             enabled=enabled,
+            title=title,
+            output_schema=output_schema,
+            annotations=annotations,
+            icons=list(icons) if icons is not None else None,
         )
         setattr(fn, _TOOL_ATTR, spec)
 

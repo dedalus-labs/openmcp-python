@@ -125,10 +125,24 @@ class ToolsService:
             if not self._is_tool_enabled(spec):
                 continue
 
+            annotations_payload = spec.annotations or {}
+            if spec.title is not None and "title" not in annotations_payload:
+                annotations_payload = {**annotations_payload, "title": spec.title}
+            annotations = None
+            if annotations_payload:
+                annotations = types.ToolAnnotations.model_validate(annotations_payload)
+
+            icons = None
+            if spec.icons is not None:
+                icons = [types.Icon.model_validate(icon) for icon in spec.icons]
+
             tool_def = types.Tool(
                 name=spec.name,
                 description=spec.description or None,
                 inputSchema=spec.input_schema or self._build_input_schema(spec.fn),
+                outputSchema=spec.output_schema or {"type": "object", "additionalProperties": True},
+                annotations=annotations,
+                icons=icons,
             )
             self._tool_defs[spec.name] = tool_def
             self._attach(spec.name, spec.fn)

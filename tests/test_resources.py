@@ -56,6 +56,14 @@ async def test_resource_subscription_emits_updates():
 
 
 @pytest.mark.anyio
+async def test_resource_unknown_uri_returns_empty_contents():
+    server = MCPServer("resources-missing")
+
+    result = await server.invoke_resource("resource://demo/missing")
+    assert result.contents == []
+
+
+@pytest.mark.anyio
 async def test_resource_unsubscribe_stops_notifications():
     server = MCPServer("resources-unsubscribe")
     session = DummySession()
@@ -271,6 +279,26 @@ async def test_resources_list_invalid_cursor():
         await run_with_context(DummySession("res-invalid"), handler, request)
 
     assert excinfo.value.error.code == types.INVALID_PARAMS
+
+
+@pytest.mark.anyio
+async def test_resources_list_negative_cursor_clamps_to_start():
+    server = MCPServer("resources-negative-cursor")
+
+    for idx in range(3):
+
+        @resource(f"resource://demo/{idx}")
+        def _res(value=idx):  # pragma: no cover - invoked via list
+            return str(value)
+
+        server.register_resource(_res)
+
+    handler = server.request_handlers[types.ListResourcesRequest]
+    request = types.ListResourcesRequest(params=types.PaginatedRequestParams(cursor="-10"))
+    response = await run_with_context(DummySession("res-negative"), handler, request)
+
+    assert [resource.uri for resource in response.root.resources]  # non-empty
+    assert response.root.nextCursor is None
 
 
 @pytest.mark.anyio

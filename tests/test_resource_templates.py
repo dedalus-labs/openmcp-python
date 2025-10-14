@@ -30,6 +30,34 @@ async def test_resource_template_registration():
 
 
 @pytest.mark.anyio
+async def test_resource_template_decorator_metadata_fields():
+    server = MCPServer("template-metadata")
+
+    with server.collecting():
+
+        @resource_template(
+            "docs",
+            uri_template="resource://docs/{path}",
+            title="Documentation",
+            description="Docs with metadata",
+            icons=[{"src": "file:///docs.png"}],
+            annotations={"audience": ["user"]},
+            meta={"category": "docs"},
+        )
+        def _docs():
+            return None
+
+    result = await server.list_resource_templates_paginated()
+    assert len(result.resourceTemplates) == 1
+    tmpl = result.resourceTemplates[0]
+    assert tmpl.title == "Documentation"
+    assert tmpl.description == "Docs with metadata"
+    assert tmpl.icons and tmpl.icons[0].src == "file:///docs.png"
+    assert tmpl.annotations and tmpl.annotations.audience == ["user"]
+    assert tmpl.meta == {"category": "docs"}
+
+
+@pytest.mark.anyio
 async def test_resource_template_registration_outside_collecting():
     server = MCPServer("template-register")
 

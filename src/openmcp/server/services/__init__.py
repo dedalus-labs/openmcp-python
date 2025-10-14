@@ -5,6 +5,8 @@ from .resources import ResourcesService
 from .prompts import PromptsService
 from .completions import CompletionService
 from .logging import LoggingService
+from .roots import RootsService, RootGuard
+from .sampling import SamplingService
 
 __all__ = [
     "ToolsService",
@@ -12,4 +14,7 @@ __all__ = [
     "PromptsService",
     "CompletionService",
     "LoggingService",
+    "RootsService",
+    "RootGuard",
+    "SamplingService",
 ]

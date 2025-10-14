@@ -1,5 +1,5 @@
 """Server-facing helpers for OpenMCP."""
 
-from .app import NotificationFlags, MCPServer
+from .app import MCPServer, NotificationFlags, TransportLiteral
 
-__all__ = ["NotificationFlags", "MCPServer"]
+__all__ = ["MCPServer", "NotificationFlags", "TransportLiteral"]

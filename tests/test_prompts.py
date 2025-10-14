@@ -63,6 +63,16 @@ async def test_prompt_missing_argument_raises_mcp_error() -> None:
 
 
 @pytest.mark.anyio
+async def test_prompt_unknown_name_raises_mcp_error() -> None:
+    server = MCPServer("prompts-unknown")
+
+    with pytest.raises(McpError) as excinfo:
+        await server.invoke_prompt("does-not-exist")
+
+    assert excinfo.value.error.code == types.INVALID_PARAMS
+
+
+@pytest.mark.anyio
 async def test_prompt_custom_mapping_result() -> None:
     server = MCPServer("prompts-mapping")
 
@@ -80,6 +90,21 @@ async def test_prompt_custom_mapping_result() -> None:
     result = await server.invoke_prompt("status")
     assert result.description == "Status template"
     assert result.messages[0].role == "assistant"
+
+
+@pytest.mark.anyio
+async def test_prompt_none_result_produces_empty_messages() -> None:
+    server = MCPServer("prompts-none")
+
+    with server.collecting():
+
+        @prompt("noop", description="No output")
+        def noop(arguments: dict[str, str] | None = None):  # pragma: no cover - invoked below
+            return None
+
+    result = await server.invoke_prompt("noop")
+    assert result.messages == []
+    assert result.description == "No output"
 
 
 @pytest.mark.anyio

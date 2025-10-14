@@ -24,20 +24,32 @@ if TYPE_CHECKING:  # pragma: no cover
 class ResourceTemplateSpec:
     name: str
     uri_template: str
+    title: str | None = None
     description: str | None = None
     mime_type: str | None = None
     icons: list[types.Icon] | None = None
+    annotations: Mapping[str, object] | None = None
     meta: Mapping[str, object] | None = None
 
     def to_resource_template(self) -> types.ResourceTemplate:
+        annotations = None
+        if self.annotations is not None:
+            annotations = types.Annotations.model_validate(self.annotations)
+
+        meta_payload = dict(self.meta) if self.meta is not None else None
+        kwargs: dict[str, object] = {}
+        if meta_payload is not None:
+            kwargs["_meta"] = meta_payload
+
         return types.ResourceTemplate(
             name=self.name,
-            title=None,
+            title=self.title,
             uriTemplate=self.uri_template,
             description=self.description,
             mimeType=self.mime_type,
             icons=self.icons,
-            meta=dict(self.meta) if self.meta is not None else None,
+            annotations=annotations,
+            **kwargs,
         )
 
 
@@ -64,9 +76,11 @@ def resource_template(
     name: str,
     *,
     uri_template: str,
+    title: str | None = None,
     description: str | None = None,
     mime_type: str | None = None,
     icons: Iterable[Mapping[str, object]] | None = None,
+    annotations: Mapping[str, object] | None = None,
     meta: Mapping[str, object] | None = None,
 ):
     """Register metadata for a resource template.
@@ -74,15 +88,17 @@ def resource_template(
     Mirrors ``resources/templates/list`` requirements.
 
     """
-    icon_list = [types.Icon(**icon) for icon in icons] if icons else None
+    icon_list = [types.Icon.model_validate(icon) for icon in icons] if icons else None
 
     def decorator(fn):
         spec = ResourceTemplateSpec(
             name=name,
             uri_template=uri_template,
+            title=title,
             description=description,
             mime_type=mime_type,
             icons=icon_list,
+            annotations=annotations,
             meta=meta,
         )
         setattr(fn, _TEMPLATE_ATTR, spec)

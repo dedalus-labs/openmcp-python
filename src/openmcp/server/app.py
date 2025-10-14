@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
-from typing import Any
+from functools import wraps
+import inspect
+from typing import Any, Literal
 from collections.abc import Callable, Iterable, Mapping
 
 from .._sdk_loader import ensure_sdk_importable
@@ -12,7 +14,12 @@ from .._sdk_loader import ensure_sdk_importable
 ensure_sdk_importable()
 
 import mcp.types as types
-from mcp.server.lowlevel.server import NotificationOptions, Server, lifespan as default_lifespan
+from mcp.server.lowlevel.server import (
+    NotificationOptions,
+    Server,
+    lifespan as default_lifespan,
+    request_ctx,
+)
 from mcp.server.models import InitializationOptions
 from mcp.shared.exceptions import McpError
 
@@ -48,10 +55,14 @@ from .services import (
     PromptsService,
     ResourcesService,
     RootsService,
+    SamplingService,
     ToolsService,
 )
 from .subscriptions import SubscriptionManager
 from .notifications import DefaultNotificationSink, NotificationSink
+from .transports import StdioTransport, StreamableHTTPTransport
+
+TransportLiteral = Literal["stdio", "streamable-http"]
 
 
 @dataclass(slots=True)
@@ -106,11 +117,7 @@ class MCPServer(Server[Any, Any]):
             pagination_limit=self._PAGINATION_LIMIT,
             notification_sink=self._notification_sink,
         )
-        self.roots = RootsService(
-            logger=self._logger,
-            pagination_limit=self._PAGINATION_LIMIT,
-            notification_sink=self._notification_sink,
-        )
+        self.roots = RootsService(self._call_roots_list)
         self.tools = ToolsService(
             server_ref=self,
             attach_callable=self._attach_tool,
@@ -129,6 +136,10 @@ class MCPServer(Server[Any, Any]):
             self._logger,
             notification_sink=self._notification_sink,
         )
+        self.sampling = SamplingService()
+
+        self.notification_handlers[types.InitializedNotification] = self._handle_initialized
+        self.notification_handlers[types.RootsListChangedNotification] = self._handle_roots_list_changed
 
         # //////////////////////////////////////////////////////////////////
         # Register default handlers
@@ -146,12 +157,6 @@ class MCPServer(Server[Any, Any]):
         async def _list_templates(request: types.ListResourceTemplatesRequest) -> types.ListResourceTemplatesResult:
             cursor = request.params.cursor if request.params is not None else None
             return await self.resources.list_templates(cursor)
-
-        async def _list_roots_handler(request: types.ListRootsRequest) -> types.ServerResult:
-            result = await self.roots.list_roots(request)
-            return types.ServerResult(result)
-
-        self.request_handlers[types.ListRootsRequest] = _list_roots_handler
 
         @self.list_tools()
         async def _list_tools(request: types.ListToolsRequest) -> types.ListToolsResult:
@@ -216,9 +221,6 @@ class MCPServer(Server[Any, Any]):
     ) -> ResourceTemplateSpec:
         return self.resources.register_template(target)
 
-    def set_roots(self, roots: Iterable[types.Root]) -> None:
-        self.roots.set_roots(roots)
-
     def register_prompt(self, target: PromptSpec | Callable[..., Any]) -> PromptSpec:
         return self.prompts.register(target)
 
@@ -247,6 +249,13 @@ class MCPServer(Server[Any, Any]):
     ) -> types.Completion | None:
         return await self.completions.execute(ref, argument, context)
 
+    async def request_sampling(
+        self, params: types.CreateMessageRequestParams
+    ) -> types.CreateMessageResult:
+        """Proxy ``sampling/createMessage`` (docs/mcp/spec/schema-reference/sampling-createmessage.md)."""
+
+        return await self.sampling.create_message(params)
+
     async def list_resource_templates_paginated(
         self,
         cursor: str | None = None,
@@ -259,10 +268,6 @@ class MCPServer(Server[Any, Any]):
     async def notify_resources_list_changed(self) -> None:
         if self._notification_flags.resources_changed:
             await self.resources.notify_list_changed()
-
-    async def notify_roots_list_changed(self) -> None:
-        if self._notification_flags.roots_changed:
-            await self.roots.notify_list_changed()
 
     async def notify_tools_list_changed(self) -> None:
         if self._notification_flags.tools_changed:
@@ -280,6 +285,73 @@ class MCPServer(Server[Any, Any]):
         logger: str | None = None,
     ) -> None:
         await self.logging_service.emit(level, data, logger)
+
+    def require_within_roots(self, *, argument: str = "path") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Decorator enforcing that a handler argument resolves within allowed roots."""
+
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            if not inspect.iscoroutinefunction(func):
+                raise TypeError("require_within_roots expects an async function")
+
+            @wraps(func)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                if argument not in kwargs:
+                    raise McpError(
+                        types.ErrorData(
+                            code=types.INVALID_PARAMS,
+                            message=f"Argument '{argument}' is required for roots validation",
+                        )
+                    )
+
+                try:
+                    context = request_ctx.get()
+                except LookupError as exc:
+                    raise RuntimeError("Roots guard requires an active request context") from exc
+
+                guard = self.roots.guard(context.session)
+                candidate = kwargs[argument]
+                if not guard.within(candidate):
+                    raise McpError(
+                        types.ErrorData(
+                            code=types.INVALID_PARAMS,
+                            message=f"Path '{candidate}' is outside the client's declared roots",
+                        )
+                    )
+
+                return await func(*args, **kwargs)
+
+            return wrapper
+
+        return decorator
+
+    async def _call_roots_list(
+        self,
+        session,
+        params: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any]:
+        request = types.ListRootsRequest(params=params)
+        result = await session.send_request(types.ServerRequest(request), types.ListRootsResult)
+        payload: dict[str, Any] = {
+            "roots": [root.model_dump(by_alias=True) for root in result.roots],
+        }
+        next_cursor = getattr(result, "nextCursor", None)
+        if next_cursor is not None:
+            payload["nextCursor"] = next_cursor
+        return payload
+
+    async def _handle_initialized(self, _notification: types.InitializedNotification) -> None:
+        try:
+            context = request_ctx.get()
+        except LookupError:  # pragma: no cover - defensive
+            return
+        await self.roots.on_session_open(context.session)
+
+    async def _handle_roots_list_changed(self, _notification: types.RootsListChangedNotification) -> None:
+        try:
+            context = request_ctx.get()
+        except LookupError:  # pragma: no cover - defensive
+            return
+        await self.roots.on_list_changed(context.session)
 
     # //////////////////////////////////////////////////////////////////
     # Initialization & capability negotiation
@@ -350,18 +422,8 @@ class MCPServer(Server[Any, Any]):
         raise_exceptions: bool = False,
         stateless: bool = False,
     ) -> None:
-        from mcp.server.stdio import stdio_server
-
-        init_options = self.create_initialization_options()
-
-        async with stdio_server() as (read_stream, write_stream):
-            await self.run(
-                read_stream,
-                write_stream,
-                init_options,
-                raise_exceptions=raise_exceptions,
-                stateless=stateless,
-            )
+        transport = StdioTransport(self)
+        await transport.run(raise_exceptions=raise_exceptions, stateless=stateless)
 
     async def serve(
         self,
@@ -381,13 +443,17 @@ class MCPServer(Server[Any, Any]):
         host: str = "127.0.0.1",
         port: int = 3000,
         path: str = "/mcp",
+        log_level: str = "info",
+        **uvicorn_options: Any,
     ) -> None:
-        from mcp.server.streamable_http import streamable_http_server
-
-        init_options = self.create_initialization_options()
-
-        async with streamable_http_server(host=host, port=port, path=path) as (read_stream, write_stream):
-            await self.run(read_stream, write_stream, init_options)
+        transport = StreamableHTTPTransport(self)
+        await transport.run(
+            host=host,
+            port=port,
+            path=path,
+            log_level=log_level,
+            **uvicorn_options,
+        )
 
     # //////////////////////////////////////////////////////////////////
     # Internal helpers

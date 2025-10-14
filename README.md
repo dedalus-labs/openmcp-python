@@ -6,6 +6,15 @@ protocol compliance while layering an ergonomic developer experience on top.
 
 ## Features
 
+- Composable architecture: capability services are injected (no mixin chains)
+  and transports live in swappable adapters, so forks can extend behaviour
+  without touching core server logic (see `docs/mcp/core/architecture`).
+- High-level `MCPClient` wrapper with optional sampling, elicitation, logging,
+  and roots support, following the guidance in
+  `docs/mcp/core/understanding-mcp-clients/*`.
+- Roots service caches `roots/list`, listens for
+  `notifications/roots/list_changed`, and provides helpers for guarding
+  filesystem access (`docs/mcp/capabilities/roots/*`).
 - Ambient tool/resource/prompt registration via ``@tool``, ``@resource`` and
   ``@prompt`` inside ``server.collecting`` (see
   `docs/mcp/spec/schema-reference/tools-list.md`,
@@ -20,13 +29,11 @@ protocol compliance while layering an ergonomic developer experience on top.
 - Logging capability wired into ``logging/setLevel``; the default handler maps
   protocol levels to Python logging levels. See
   `docs/openmcp/logging.md` and `docs/mcp/spec/schema-reference/logging-setlevel.md`.
-- Roots capability for client-defined workspace boundaries. Configure roots via
-  ``server.set_roots([...])`` and emit ``notifications/roots/list_changed`` when
-  ``NotificationFlags(roots_changed=True)`` is enabled. See
-  `docs/openmcp/roots.md` and `docs/mcp/capabilities/roots`.
 - Allow-list gating and per-tool enable predicates.
 - Automatic JSON Schema inference from function signatures via Pydantic
   ``TypeAdapter``.
+- Protocol negotiation pinned to the current MCP revision (``2025-06-18``);
+  see `docs/openmcp/versioning.md`.
 - Optional logging helpers that mirror the shared logger from `api-final`.
 - Compatible with the reference `mcp` SDK shipping in `_references/python-sdk`.
 - Transport selection via `MCPServer(..., transport="stdio")` +

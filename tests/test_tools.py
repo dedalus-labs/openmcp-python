@@ -15,6 +15,7 @@ async def test_collecting_registers_tools():
     server = MCPServer("demo")
 
     with server.collecting():
+
         @tool(description="Adds two numbers")
         def add(a: int, b: int) -> int:
             return a + b
@@ -34,6 +35,7 @@ async def test_allowlist_controls_visibility():
     server.allow_tools(["slow"])
 
     with server.collecting():
+
         @tool()
         def add(a: int, b: int) -> int:
             return a + b
@@ -105,6 +107,7 @@ def test_type_adapter_schema():
     server = MCPServer("schema")
 
     with server.collecting():
+
         @tool()
         def analytics(a: int, count: int = 1, tags: list[str] | None = None):
             return a
@@ -126,6 +129,7 @@ async def test_tools_list_pagination():
     server = MCPServer("tools-pagination")
 
     for idx in range(120):
+
         def make_tool(i: int):
             def tool_fn(value: int = 0, _i=i) -> int:
                 return _i + value
@@ -175,6 +179,7 @@ async def test_tools_list_cursor_past_end():
     server = MCPServer("tools-past-end")
 
     for idx in range(3):
+
         def make_tool(i: int):
             def _fn(_value=i):
                 return _value
@@ -190,6 +195,35 @@ async def test_tools_list_cursor_past_end():
 
     assert response.root.tools == []
     assert response.root.nextCursor is None
+
+
+@pytest.mark.anyio
+async def test_tools_metadata_fields_present():
+    server = MCPServer("tools-metadata")
+
+    with server.collecting():
+
+        @tool(
+            description="Adds two numbers",
+            title="Adder",
+            output_schema={"type": "object", "properties": {"sum": {"type": "number"}}},
+            annotations={"readOnlyHint": True},
+            icons=[{"src": "file:///icon.png"}],
+        )
+        def add(a: int, b: int) -> dict[str, int]:
+            return {"sum": a + b}
+
+    handler = server.request_handlers[types.ListToolsRequest]
+    response = await run_with_context(DummySession("tools-metadata"), handler, types.ListToolsRequest())
+
+    tool_entry = response.root.tools[0]
+    assert tool_entry.description == "Adds two numbers"
+    assert tool_entry.outputSchema == {"type": "object", "properties": {"sum": {"type": "number"}}}
+    assert tool_entry.annotations
+    assert tool_entry.annotations.title == "Adder"
+    assert tool_entry.annotations.readOnlyHint is True
+    assert tool_entry.icons
+    assert tool_entry.icons[0].src == "file:///icon.png"
 
 
 @pytest.mark.anyio
