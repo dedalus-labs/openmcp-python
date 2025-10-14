@@ -2,8 +2,12 @@ from typing import Any
 
 import pytest
 
+from openmcp import NotificationFlags, types
+from mcp.shared.exceptions import McpError
 from openmcp.server import MCPServer
 from openmcp.tool import tool
+
+from tests.helpers import DummySession, run_with_context
 
 
 @pytest.mark.asyncio
@@ -105,7 +109,7 @@ def test_type_adapter_schema():
         def analytics(a: int, count: int = 1, tags: list[str] | None = None):
             return a
 
-    schema = server._tool_defs["analytics"].inputSchema
+    schema = server.tools.definitions["analytics"].inputSchema
     props = schema["properties"]
 
     assert schema["type"] == "object"
@@ -115,3 +119,99 @@ def test_type_adapter_schema():
     assert props["count"].get("default") == 1
     tags = props["tags"]
     assert any(item.get("type") == "array" for item in tags.get("anyOf", []))
+
+
+@pytest.mark.anyio
+async def test_tools_list_pagination():
+    server = MCPServer("tools-pagination")
+
+    for idx in range(120):
+        def make_tool(i: int):
+            def tool_fn(value: int = 0, _i=i) -> int:
+                return _i + value
+
+            tool_fn.__name__ = f"tool_{i:03d}"
+            return tool_fn
+
+        server.register_tool(make_tool(idx))
+
+    handler = server.request_handlers[types.ListToolsRequest]
+
+    first = await run_with_context(DummySession("tools-1"), handler, types.ListToolsRequest())
+    first_result = first.root
+    assert len(first_result.tools) == 50
+    assert first_result.nextCursor == "50"
+
+    second_request = types.ListToolsRequest(params=types.PaginatedRequestParams(cursor="50"))
+    second = await run_with_context(DummySession("tools-2"), handler, second_request)
+    second_result = second.root
+    assert len(second_result.tools) == 50
+    assert second_result.nextCursor == "100"
+
+    third_request = types.ListToolsRequest(params=types.PaginatedRequestParams(cursor="100"))
+    third = await run_with_context(DummySession("tools-3"), handler, third_request)
+    third_result = third.root
+    assert len(third_result.tools) == 20
+    assert third_result.nextCursor is None
+
+
+@pytest.mark.anyio
+async def test_tools_list_invalid_cursor():
+    server = MCPServer("tools-invalid-cursor")
+
+    server.register_tool(tool()(lambda: None))
+    handler = server.request_handlers[types.ListToolsRequest]
+
+    request = types.ListToolsRequest(params=types.PaginatedRequestParams(cursor="oops"))
+
+    with pytest.raises(McpError) as excinfo:
+        await run_with_context(DummySession("tools-invalid"), handler, request)
+
+    assert excinfo.value.error.code == types.INVALID_PARAMS
+
+
+@pytest.mark.anyio
+async def test_tools_list_cursor_past_end():
+    server = MCPServer("tools-past-end")
+
+    for idx in range(3):
+        def make_tool(i: int):
+            def _fn(_value=i):
+                return _value
+
+            _fn.__name__ = f"tiny_{i}"
+            return _fn
+
+        server.register_tool(make_tool(idx))
+
+    handler = server.request_handlers[types.ListToolsRequest]
+    request = types.ListToolsRequest(params=types.PaginatedRequestParams(cursor="9999"))
+    response = await run_with_context(DummySession("tools-past"), handler, request)
+
+    assert response.root.tools == []
+    assert response.root.nextCursor is None
+
+
+@pytest.mark.anyio
+async def test_tools_list_changed_notification_enabled():
+    server = MCPServer("tools-list-changed", notification_flags=NotificationFlags(tools_changed=True))
+    handler = server.request_handlers[types.ListToolsRequest]
+    session = DummySession("tool-observer")
+
+    await run_with_context(session, handler, types.ListToolsRequest())
+    await server.notify_tools_list_changed()
+
+    assert session.notifications
+    assert session.notifications[-1].root.method == "notifications/tools/list_changed"
+
+
+@pytest.mark.anyio
+async def test_tools_list_changed_notification_disabled():
+    server = MCPServer("tools-list-changed-off")
+    handler = server.request_handlers[types.ListToolsRequest]
+    session = DummySession("tool-observer-off")
+
+    await run_with_context(session, handler, types.ListToolsRequest())
+    await server.notify_tools_list_changed()
+
+    assert all(note.root.method != "notifications/tools/list_changed" for note in session.notifications)

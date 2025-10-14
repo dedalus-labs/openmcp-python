@@ -17,6 +17,13 @@ protocol compliance while layering an ergonomic developer experience on top.
   ``resources/subscribe``/``resources/unsubscribe`` and
   ``server.notify_resource_updated(uri)`` to emit
   `notifications/resources/updated`.
+- Logging capability wired into ``logging/setLevel``; the default handler maps
+  protocol levels to Python logging levels. See
+  `docs/openmcp/logging.md` and `docs/mcp/spec/schema-reference/logging-setlevel.md`.
+- Roots capability for client-defined workspace boundaries. Configure roots via
+  ``server.set_roots([...])`` and emit ``notifications/roots/list_changed`` when
+  ``NotificationFlags(roots_changed=True)`` is enabled. See
+  `docs/openmcp/roots.md` and `docs/mcp/capabilities/roots`.
 - Allow-list gating and per-tool enable predicates.
 - Automatic JSON Schema inference from function signatures via Pydantic
   ``TypeAdapter``.

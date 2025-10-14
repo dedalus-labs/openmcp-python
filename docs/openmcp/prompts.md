@@ -4,7 +4,7 @@
 
 **Solution**: Provide a decorator that captures prompt metadata (name, description, arguments, icons) and a renderer that returns prompt messages in the expected shape. Handle required argument validation and error reporting automatically.
 
-**OpenMCP**: Use `@prompt` within `server.collecting()` to register prompts. A renderer receives a dictionary of arguments and returns an iterable of `(role, content)` pairs, a list of `PromptMessage` objects, or a mapping containing `messages` and optional `description`. Missing required arguments raise `McpError` with the `INVALID_PARAMS` code.
+**OpenMCP**: Use `@prompt` within `server.collecting()` to register prompts. A renderer receives a dictionary of arguments and returns an iterable of `(role, content)` pairs, a list of `PromptMessage` objects, or a mapping containing `messages` and optional `description`. Missing required arguments raise `McpError` with the `INVALID_PARAMS` code. Listings (`prompts/list`) paginate via opaque cursors per the pagination spec, so clients can pass the returned `nextCursor` while bad cursors trigger an `INVALID_PARAMS` response and a missing `nextCursor` marks completion.
 
 ```python
 from openmcp import MCPServer, prompt

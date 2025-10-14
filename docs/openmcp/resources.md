@@ -4,7 +4,7 @@
 
 **Solution**: Centralize resource registration so every definition captures URI, friendly name, MIME type, and runtime callable, while providing hooks for subscribe/unsubscribe handlers when servers opt into change notifications.
 
-**OpenMCP**: Decorate callables with `@resource` to expose text or binary content. OpenMCP normalizes return values for `resources/read` (text vs. base64 blob) and rehydrates capability metadata during initialization. Register subscription handlers via `@server.subscribe_resource()` / `@server.unsubscribe_resource()` to flip the `resources.subscribe` flag.
+**OpenMCP**: Decorate callables with `@resource` to expose text or binary content. Pagination for `resources/list` follows the spec receipts (`docs/mcp/capabilities/pagination`) by returning `nextCursor` tokens via the shared helper—invalid cursors raise `INVALID_PARAMS` (-32602) and the absence of `nextCursor` signals completion. OpenMCP normalizes return values for `resources/read` (text vs. base64 blob) and rehydrates capability metadata during initialization. Register subscription handlers via `@server.subscribe_resource()` / `@server.unsubscribe_resource()` to flip the `resources.subscribe` flag.
 
 ```python
 from openmcp import MCPServer, resource
