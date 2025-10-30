@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Roots capability support for MCP servers.
 
 Implements the cache-aside pattern described in:
@@ -17,19 +23,23 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import orjson as oj
-import os
-import weakref
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping
-from urllib.parse import urlparse, unquote
+from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote, urlparse
+import weakref
+
+import orjson as oj
+
 
 if os.name == "nt":  # pragma: no cover - Windows specific
     from urllib.request import url2pathname
 
 from mcp import types
 from mcp.shared.exceptions import McpError
+
 
 if TYPE_CHECKING:
     from mcp.server.session import ServerSession
@@ -41,7 +51,7 @@ Snapshot = tuple[types.Root, ...]
 class _CacheEntry:
     version: int
     snapshot: Snapshot
-    guard: "RootGuard"
+    guard: RootGuard
 
 
 class RootGuard:
@@ -91,9 +101,9 @@ class RootGuard:
 
 
 def _finalize_session(
-    service_ref: "weakref.ReferenceType[RootsService]",
+    service_ref: weakref.ReferenceType[RootsService],
     loop: asyncio.AbstractEventLoop,
-    session_ref: "weakref.ReferenceType[ServerSession]",
+    session_ref: weakref.ReferenceType[ServerSession],
 ) -> None:
     service = service_ref()
     session = session_ref()
@@ -112,29 +122,29 @@ class RootsService:
 
     def __init__(
         self,
-        rpc_call: Callable[["ServerSession", Mapping[str, Any] | None], Awaitable[Mapping[str, Any]]],
+        rpc_call: Callable[[ServerSession, Mapping[str, Any] | None], Awaitable[Mapping[str, Any]]],
         *,
         debounce_delay: float = 0.25,
     ) -> None:
         self._rpc_list = rpc_call
         self._debounce_delay = debounce_delay
-        self._entries: weakref.WeakKeyDictionary["ServerSession", _CacheEntry] = weakref.WeakKeyDictionary()
-        self._debouncers: weakref.WeakKeyDictionary["ServerSession", asyncio.Task] = weakref.WeakKeyDictionary()
-        self._finalizers: weakref.WeakKeyDictionary["ServerSession", Any] = weakref.WeakKeyDictionary()
+        self._entries: weakref.WeakKeyDictionary[ServerSession, _CacheEntry] = weakref.WeakKeyDictionary()
+        self._debouncers: weakref.WeakKeyDictionary[ServerSession, asyncio.Task] = weakref.WeakKeyDictionary()
+        self._finalizers: weakref.WeakKeyDictionary[ServerSession, Any] = weakref.WeakKeyDictionary()
 
-    def guard(self, session: "ServerSession") -> RootGuard:
+    def guard(self, session: ServerSession) -> RootGuard:
         entry = self._entries.get(session)
         return entry.guard if entry else RootGuard(())
 
-    def snapshot(self, session: "ServerSession") -> Snapshot:
+    def snapshot(self, session: ServerSession) -> Snapshot:
         entry = self._entries.get(session)
         return entry.snapshot if entry else ()
 
-    def version(self, session: "ServerSession") -> int:
+    def version(self, session: ServerSession) -> int:
         entry = self._entries.get(session)
         return entry.version if entry else 0
 
-    async def on_session_open(self, session: "ServerSession") -> Snapshot:
+    async def on_session_open(self, session: ServerSession) -> Snapshot:
         snapshot = await self.refresh(session)
         if session not in self._finalizers:
             loop = asyncio.get_running_loop()
@@ -144,7 +154,7 @@ class RootsService:
             self._finalizers[session] = finalizer
         return snapshot
 
-    async def on_list_changed(self, session: "ServerSession") -> None:
+    async def on_list_changed(self, session: ServerSession) -> None:
         if task := self._debouncers.get(session):
             task.cancel()
 
@@ -157,7 +167,7 @@ class RootsService:
 
         self._debouncers[session] = asyncio.create_task(_run())
 
-    async def refresh(self, session: "ServerSession") -> Snapshot:
+    async def refresh(self, session: ServerSession) -> Snapshot:
         previous = self._entries.get(session)
         snapshot = await self._fetch_snapshot(session)
 
@@ -168,7 +178,7 @@ class RootsService:
         self._entries[session] = _CacheEntry(version=version, snapshot=snapshot, guard=RootGuard(snapshot))
         return snapshot
 
-    def remove(self, session: "ServerSession") -> None:
+    def remove(self, session: ServerSession) -> None:
         if finalizer := self._finalizers.pop(session, None):
             finalizer.detach()
 
@@ -184,13 +194,13 @@ class RootsService:
         except KeyError:  # pragma: no cover - defensive cleanup
             pass
 
-    def encode_cursor(self, session: "ServerSession", offset: int) -> str:
+    def encode_cursor(self, session: ServerSession, offset: int) -> str:
         entry = self._entries.get(session)
         version = entry.version if entry else 0
         data = oj.dumps({"v": version, "o": offset})
         return base64.urlsafe_b64encode(data).decode()
 
-    def decode_cursor(self, session: "ServerSession", cursor: str | None) -> tuple[int, int]:
+    def decode_cursor(self, session: ServerSession, cursor: str | None) -> tuple[int, int]:
         entry = self._entries.get(session)
         expected_version = entry.version if entry else 0
         if not cursor:
@@ -222,7 +232,7 @@ class RootsService:
 
         return version, offset
 
-    async def _fetch_snapshot(self, session: "ServerSession") -> Snapshot:
+    async def _fetch_snapshot(self, session: ServerSession) -> Snapshot:
         roots: list[types.Root] = []
         cursor: str | None = None
 

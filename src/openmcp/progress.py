@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Progress utilities for emitting MCP-compliant telemetry.
 
 This module implements a coalescing progress tracker that honours the
@@ -29,18 +35,20 @@ absent, matching the requirements in ``docs/mcp/core/progress/progress-flow.md``
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 import logging
 import math
 import random
 import time
-from typing import Any, AsyncIterator, Callable
+from typing import Any
 
 import anyio
 
 from ._sdk_loader import ensure_sdk_importable
 from .utils.logger import get_logger
+
 
 ensure_sdk_importable()
 
@@ -48,6 +56,7 @@ from mcp.server.lowlevel.server import request_ctx
 from mcp.shared.context import RequestContext
 from mcp.shared.session import BaseSession
 from mcp.types import ProgressToken, RequestId
+
 
 __all__ = [
     "progress",
@@ -70,7 +79,7 @@ _SYSTEM_RANDOM = random.SystemRandom()
 
 @dataclass(slots=True, frozen=True)
 class ProgressConfig:
-    """Behavioural tuning knobs for progress emission.
+    """behavioral tuning knobs for progress emission.
 
     ``emit_hz`` controls the maximum emission frequency. Values ``<= 0``
     disable throttling, causing each update to send immediately. The
@@ -186,14 +195,12 @@ _DEFAULT_TELEMETRY = ProgressTelemetry()
 
 def set_default_progress_config(config: ProgressConfig) -> None:
     """Override the module-level default progress configuration."""
-
     global _DEFAULT_CONFIG
     _DEFAULT_CONFIG = config
 
 
 def set_default_progress_telemetry(telemetry: ProgressTelemetry) -> None:
     """Override the module-level default telemetry hooks."""
-
     global _DEFAULT_TELEMETRY
     _DEFAULT_TELEMETRY = telemetry
 
@@ -311,11 +318,7 @@ class _ProgressEmitter:
         return 0.0
 
     def _store_state_locked(
-        self,
-        progress: float,
-        *,
-        message: str | None,
-        total_override: float | None,
+        self, progress: float, *, message: str | None, total_override: float | None
     ) -> tuple[_ProgressState, bool]:
         previous = self._latest or self._last_emitted
         if previous and progress < previous.progress:
@@ -327,7 +330,9 @@ class _ProgressEmitter:
             if total_override is not None
             else self._default_total
             if self._default_total is not None
-            else previous.total if previous else None
+            else previous.total
+            if previous
+            else None
         )
         state = _ProgressState(progress=progress, total=total, message=message, timestamp_ns=time.monotonic_ns())
         throttled = False
@@ -372,10 +377,7 @@ class _ProgressEmitter:
         while True:
             try:
                 await self._session.send_progress_notification(
-                    self._token,
-                    state.progress,
-                    total=state.total,
-                    message=state.message,
+                    self._token, state.progress, total=state.total, message=state.message
                 )
             except (anyio.get_cancelled_exc_class(), KeyboardInterrupt):  # pragma: no cover - cancellation path
                 raise
@@ -464,23 +466,16 @@ class ProgressTracker:
 
     async def advance(self, amount: float, message: str | None = None) -> float:
         """Advance progress by ``amount`` and return the new value."""
-
         return await self._emitter.advance(amount, message=message)
 
-    async def set(
-        self,
-        progress: float,
-        *,
-        message: str | None = None,
-        total: float | None = None,
-    ) -> None:
+    async def set(self, progress: float, *, message: str | None = None, total: float | None = None) -> None:
         """Set progress explicitly.
 
         ``progress`` must be monotonically increasing as mandated by the MCP
         specification. ``total`` overrides the configured total for this update.
         """
-
         await self._emitter.set(progress, message=message, total=total)
+
 
 def _resolve_request_context() -> RequestContext[BaseSession[Any, Any, Any, Any, Any], Any, Any]:
     try:
@@ -506,7 +501,7 @@ async def progress(
 
     The returned tracker exposes :meth:`advance` and :meth:`set` helpers. This
     context manager must be used within an active MCP request handler so that
-    ``request_ctx`` is available, mirroring the behaviour of the reference SDK.
+    ``request_ctx`` is available, mirroring the behavior of the reference SDK.
 
     """
     ctx = _resolve_request_context()
@@ -517,7 +512,6 @@ async def progress(
     config = config or _DEFAULT_CONFIG
     telemetry = telemetry or _DEFAULT_TELEMETRY
     logger = logger or _LOGGER
-
 
     emitter = _ProgressEmitter(
         session=session,

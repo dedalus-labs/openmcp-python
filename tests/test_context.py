@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
 import pytest
@@ -16,6 +22,7 @@ async def test_tool_context_emits_logs_and_progress() -> None:
     server = MCPServer("ctx-tool")
 
     with server.binding():
+
         @tool(description="exercise context helper")
         async def sample() -> str:
             ctx = get_context()
@@ -29,13 +36,7 @@ async def test_tool_context_emits_logs_and_progress() -> None:
     session = RecordingSession("ctx-tool-session")
     meta = types.RequestParams.Meta(progressToken="token-123")
 
-    result = await run_with_context(
-        session,
-        server.tools.call_tool,
-        "sample",
-        {},
-        meta=meta,
-    )
+    result = await run_with_context(session, server.tools.call_tool, "sample", {}, meta=meta)
 
     assert result  # basic smoke check on return coercion
     assert [level for level, *_ in session.log_messages] == ["info", "debug"]
@@ -50,6 +51,7 @@ async def test_tool_context_no_progress_token_is_noop() -> None:
     server = MCPServer("ctx-tool-no-progress")
 
     with server.binding():
+
         @tool(description="progress noop")
         async def sample() -> str:
             ctx = get_context()
@@ -70,6 +72,7 @@ async def test_resource_read_binds_context() -> None:
     seen: list[tuple[str, int]] = []
 
     with server.binding():
+
         @resource("resource://ctx", name="ctx")
         def sample() -> str:
             ctx = get_context()
@@ -92,6 +95,7 @@ async def test_prompt_renderer_binds_context() -> None:
     seen: list[str] = []
 
     with server.binding():
+
         @prompt("ctx", description="ctx")
         def sample(arguments: dict[str, str] | None) -> list[tuple[str, str]]:
             ctx = get_context()
@@ -113,6 +117,7 @@ async def test_call_tool_without_request_context_succeeds() -> None:
     server = MCPServer("ctx-direct-tool")
 
     with server.binding():
+
         @tool(description="plain tool")
         async def sample() -> str:
             return "ok"
@@ -127,6 +132,7 @@ async def test_resource_read_without_request_context_succeeds() -> None:
     server = MCPServer("ctx-direct-resource")
 
     with server.binding():
+
         @resource("resource://direct")
         def sample() -> str:
             return "ok"
@@ -141,6 +147,7 @@ async def test_prompt_get_without_request_context_succeeds() -> None:
     server = MCPServer("ctx-direct-prompt")
 
     with server.binding():
+
         @prompt("direct", description="direct")
         def sample(arguments: dict[str, str] | None) -> list[tuple[str, str]]:
             return [("assistant", "hello")]

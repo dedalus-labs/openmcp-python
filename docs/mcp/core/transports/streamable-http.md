@@ -60,7 +60,7 @@ MCP endpoint.
      stream.
    * Disconnection **MAY** occur at any time (e.g., due to network conditions).
      Therefore:
-     * Disconnection **SHOULD NOT** be interpreted as the client cancelling its request.
+     * Disconnection **SHOULD NOT** be interpreted as the client canceling its request.
      * To cancel, the client **SHOULD** explicitly send an MCP `CancelledNotification`.
      * To avoid message loss due to disconnection, the server **MAY** make the stream
        [resumable](#resumability-and-redelivery).
@@ -123,7 +123,7 @@ server, beginning with the [initialization phase](/specification/2025-06-18/basi
 servers which want to establish stateful sessions:
 
 1. A server using the Streamable HTTP transport **MAY** assign a session ID at
-   initialization time, by including it in an `Mcp-Session-Id` header on the HTTP
+   initialization time, by including it in an `Mcp-Session-Id` (normalized to `mcp-session-id`) header on the HTTP
    response containing the `InitializeResult`.
    * The session ID **SHOULD** be globally unique and cryptographically secure (e.g., a
      securely generated UUID, a JWT, or a cryptographic hash).

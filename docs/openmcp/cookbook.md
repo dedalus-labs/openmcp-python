@@ -155,7 +155,7 @@ from openmcp import MCPClient
 from openmcp.client import lambda_http_client
 
 async def main():
-    async with lambda_http_client("http://127.0.0.1:3000/mcp") as (r, w, _):
+    async with lambda_http_client("http://127.0.0.1:8000/mcp") as (r, w, _):
         async with MCPClient(r, w) as client:
             tools = await client.session.list_tools()
             result = await client.session.call_tool("echo", {"text": "hello"})

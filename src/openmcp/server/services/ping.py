@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Ping helpers for MCP servers (docs/mcp/spec/schema-reference/ping.md)."""
 
 from __future__ import annotations
@@ -12,9 +18,12 @@ import weakref
 import anyio
 import anyio.abc
 
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from logging import Logger
+
     from mcp.server.session import ServerSession
+
     from ..notifications import NotificationSink
 
 import secrets
@@ -26,20 +35,20 @@ class PingService:
     def __init__(
         self,
         *,
-        notification_sink: "NotificationSink" | None = None,
-        logger: "Logger" | None = None,
+        notification_sink: NotificationSink | None = None,
+        logger: Logger | None = None,
         ewma_alpha: float = 0.2,
         history_size: int = 32,
         failure_budget: int = 3,
         default_phi: float = 5.0,
         rng: Callable[[float, float], float] | None = None,
-        on_suspect: Callable[["ServerSession", float], None] | None = None,
-        on_down: Callable[["ServerSession"], None] | None = None,
+        on_suspect: Callable[[ServerSession, float], None] | None = None,
+        on_down: Callable[[ServerSession], None] | None = None,
     ) -> None:
         self.notification_sink = notification_sink
         self._logger = logger
-        self._sessions: weakref.WeakSet["ServerSession"] = weakref.WeakSet()
-        self._states: weakref.WeakKeyDictionary["ServerSession", _SessionState] = weakref.WeakKeyDictionary()
+        self._sessions: weakref.WeakSet[ServerSession] = weakref.WeakSet()
+        self._states: weakref.WeakKeyDictionary[ServerSession, _SessionState] = weakref.WeakKeyDictionary()
         self._ewma_alpha = ewma_alpha
         self._history_size = history_size
         self._failure_budget = failure_budget
@@ -53,40 +62,40 @@ class PingService:
     # Session lifecycle
     # ------------------------------------------------------------------
 
-    def register(self, session: "ServerSession") -> None:
+    def register(self, session: ServerSession) -> None:
         if session not in self._sessions:
             self._sessions.add(session)
             self._states[session] = _SessionState(history_size=self._history_size)
 
-    def discard(self, session: "ServerSession") -> None:
+    def discard(self, session: ServerSession) -> None:
         self._sessions.discard(session)
         self._states.pop(session, None)
 
-    def active(self) -> tuple["ServerSession", ...]:
+    def active(self) -> tuple[ServerSession, ...]:
         return tuple(self._sessions)
 
-    def touch(self, session: "ServerSession") -> None:
+    def touch(self, session: ServerSession) -> None:
         self._state(session).touch(time.monotonic_ns())
 
     # ------------------------------------------------------------------
     # Metrics helpers
     # ------------------------------------------------------------------
 
-    def _state(self, session: "ServerSession") -> "_SessionState":
+    def _state(self, session: ServerSession) -> _SessionState:
         state = self._states.get(session)
         if state is None:
             state = _SessionState(history_size=self._history_size)
             self._states[session] = state
         return state
 
-    def round_trip_time(self, session: "ServerSession") -> float | None:
+    def round_trip_time(self, session: ServerSession) -> float | None:
         return self._state(session).ewma_rtt
 
-    def suspicion(self, session: "ServerSession", *, now: float | None = None) -> float:
+    def suspicion(self, session: ServerSession, *, now: float | None = None) -> float:
         state = self._state(session)
         return state.phi(now=now)
 
-    def is_alive(self, session: "ServerSession", *, phi_threshold: float | None = None) -> bool:
+    def is_alive(self, session: ServerSession, *, phi_threshold: float | None = None) -> bool:
         state = self._state(session)
         threshold = phi_threshold if phi_threshold is not None else self._default_phi
         return state.consecutive_failures <= self._failure_budget and state.phi() < threshold
@@ -95,7 +104,7 @@ class PingService:
     # Ping execution
     # ------------------------------------------------------------------
 
-    async def ping(self, session: "ServerSession", *, timeout: float | None = None) -> bool:
+    async def ping(self, session: ServerSession, *, timeout: float | None = None) -> bool:
         state = self._state(session)
         started_ns = time.monotonic_ns()
         try:
@@ -106,7 +115,7 @@ class PingService:
                     await session.send_ping()
         except (anyio.get_cancelled_exc_class(), KeyboardInterrupt):  # pragma: no cover - cancellation
             raise
-        except Exception as exc:  # pragma: no cover - exercised via tests
+        except Exception as exc:
             state.record_failure(time.monotonic_ns())
             self._log("ping-failed", session, error=str(exc))
             return False
@@ -119,16 +128,16 @@ class PingService:
 
     async def ping_many(
         self,
-        sessions: Iterable["ServerSession"] | None = None,
+        sessions: Iterable[ServerSession] | None = None,
         *,
         timeout: float | None = None,
         max_concurrency: int | None = None,
-    ) -> dict["ServerSession", bool]:
+    ) -> dict[ServerSession, bool]:
         targets = tuple(sessions) if sessions is not None else self.active()
-        results: dict["ServerSession", bool] = {}
+        results: dict[ServerSession, bool] = {}
         semaphore = anyio.Semaphore(max_concurrency) if max_concurrency else None
 
-        async def _probe(target: "ServerSession") -> None:
+        async def _probe(target: ServerSession) -> None:
             if semaphore:
                 async with semaphore:
                     results[target] = await self.ping(target, timeout=timeout)
@@ -204,7 +213,7 @@ class PingService:
     # Internal utilities
     # //////////////////////////////////////////////////////////////////
 
-    def _log(self, event: str, session: "ServerSession", **extra: object) -> None:
+    def _log(self, event: str, session: ServerSession, **extra: object) -> None:
         if not self._logger:
             return
         payload = {"event": event, "session_id": getattr(session, "id", None), **extra}

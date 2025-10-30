@@ -1,15 +1,18 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
 import asyncio
 from typing import Any
 
-import anyio
+from mcp.shared.exceptions import McpError
 import pytest
 
-from mcp.shared.exceptions import McpError
-
 from openmcp import MCPServer, types
-
 from tests.helpers import DummySession, run_with_context
 
 
@@ -19,21 +22,14 @@ class FakeSession(DummySession):
         self.capable = True
         self.requests: list[types.ServerRequest] = []
         self.result = types.CreateMessageResult(
-            role="assistant",
-            content=types.TextContent(type="text", text="ok"),
-            model="demo",
-            stopReason="endTurn",
+            role="assistant", content=types.TextContent(type="text", text="ok"), model="demo", stopReason="endTurn"
         )
 
     def check_client_capability(self, capability: types.ClientCapabilities) -> bool:  # type: ignore[override]
         return self.capable
 
     async def send_request(
-        self,
-        request: types.ServerRequest,
-        result_type: type[Any],
-        *,
-        progress_callback=None,
+        self, request: types.ServerRequest, result_type: type[Any], *, progress_callback=None
     ) -> Any:
         self.requests.append(request)
         if isinstance(self.result, Exception):
@@ -48,13 +44,7 @@ async def test_sampling_missing_capability_raises_method_not_found() -> None:
     session.capable = False
 
     params = types.CreateMessageRequestParams(
-        messages=[
-            types.SamplingMessage(
-                role="user",
-                content=types.TextContent(type="text", text="hi"),
-            )
-        ],
-        maxTokens=10,
+        messages=[types.SamplingMessage(role="user", content=types.TextContent(type="text", text="hi"))], maxTokens=10
     )
 
     with pytest.raises(McpError) as exc:
@@ -68,12 +58,7 @@ async def test_sampling_successful_roundtrip_records_request() -> None:
     session = FakeSession()
 
     params = types.CreateMessageRequestParams(
-        messages=[
-            types.SamplingMessage(
-                role="user",
-                content=types.TextContent(type="text", text="hello"),
-            )
-        ],
+        messages=[types.SamplingMessage(role="user", content=types.TextContent(type="text", text="hello"))],
         maxTokens=32,
     )
 
@@ -89,17 +74,10 @@ async def test_sampling_successful_roundtrip_records_request() -> None:
 async def test_sampling_propagates_client_error() -> None:
     server = MCPServer("sampling")
     session = FakeSession()
-    session.result = McpError(
-        types.ErrorData(code=-1, message="User rejected sampling request")
-    )
+    session.result = McpError(types.ErrorData(code=-1, message="User rejected sampling request"))
 
     params = types.CreateMessageRequestParams(
-        messages=[
-            types.SamplingMessage(
-                role="user",
-                content=types.TextContent(type="text", text="hello"),
-            )
-        ],
+        messages=[types.SamplingMessage(role="user", content=types.TextContent(type="text", text="hello"))],
         maxTokens=32,
     )
 
@@ -121,13 +99,7 @@ async def test_sampling_timeout_triggers_circuit_breaker() -> None:
     session.send_request = slow_send  # type: ignore[assignment]
 
     params = types.CreateMessageRequestParams(
-        messages=[
-            types.SamplingMessage(
-                role="user",
-                content=types.TextContent(type="text", text="slow"),
-            )
-        ],
-        maxTokens=4,
+        messages=[types.SamplingMessage(role="user", content=types.TextContent(type="text", text="slow"))], maxTokens=4
     )
 
     server.sampling._timeout = 0.01  # type: ignore[attr-defined]
@@ -135,4 +107,3 @@ async def test_sampling_timeout_triggers_circuit_breaker() -> None:
     with pytest.raises(McpError) as exc:
         await run_with_context(session, server.request_sampling, params)
     assert exc.value.error.code == types.INTERNAL_ERROR
-

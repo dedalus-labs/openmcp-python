@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Prompt capability tests.
 
 Exercises the prompt lifecycle defined in
@@ -7,12 +13,10 @@ Exercises the prompt lifecycle defined in
 
 from __future__ import annotations
 
+from mcp.shared.exceptions import McpError
 import pytest
 
-from mcp.shared.exceptions import McpError
-
 from openmcp import MCPServer, NotificationFlags, prompt, types
-
 from tests.helpers import DummySession, run_with_context
 
 
@@ -29,10 +33,7 @@ async def test_prompt_registration_and_rendering() -> None:
         )
         def greet(arguments: dict[str, str]):
             name = arguments["name"]
-            return [
-                ("assistant", "You are a helpful assistant."),
-                ("user", f"Say hello to {name}"),
-            ]
+            return [("assistant", "You are a helpful assistant."), ("user", f"Say hello to {name}")]
 
     assert server.prompt_names == ["greet"]
 
@@ -49,11 +50,8 @@ async def test_prompt_missing_argument_raises_mcp_error() -> None:
 
     with server.binding():
 
-        @prompt(
-            "needs-arg",
-            arguments=[{"name": "topic", "required": True}],
-        )
-        def _needs_arg(arguments: dict[str, str]):  # pragma: no cover - exercised via invocation
+        @prompt("needs-arg", arguments=[{"name": "topic", "required": True}])
+        def _needs_arg(arguments: dict[str, str]):
             return [("assistant", f"Topic is {arguments['topic']}")]
 
     with pytest.raises(McpError) as excinfo:
@@ -80,12 +78,7 @@ async def test_prompt_custom_mapping_result() -> None:
 
         @prompt("status")
         async def status_prompt(_: dict[str, str]):
-            return {
-                "description": "Status template",
-                "messages": [
-                    ("assistant", "You summarize status reports."),
-                ],
-            }
+            return {"description": "Status template", "messages": [("assistant", "You summarize status reports.")]}
 
     result = await server.invoke_prompt("status")
     assert result.description == "Status template"
@@ -113,6 +106,7 @@ async def test_prompts_list_pagination() -> None:
 
     with server.binding():
         for idx in range(120):
+
             def make_prompt(i: int):
                 @prompt(f"prompt-{i:03d}")
                 def _prompt(arguments: dict[str, str] | None = None, _i=i):

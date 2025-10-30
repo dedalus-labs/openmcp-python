@@ -2,7 +2,7 @@
 
 OpenMCP is a thin, spec-faithful wrapper over the Model Context Protocol (MCP) reference SDK. It
 adds light ergonomics—ambient registration, schema inference, simplified transports—while keeping the
-wire behaviour identical to the MCP specification.
+wire behavior identical to the MCP specification.
 
 ## Architectural Layers
 
@@ -38,7 +38,7 @@ plumbing. OpenMCP layers on:
 3. **Shutdown**: Transport closes (STDIO exit, HTTP connection close). The SDK cleans up session state.
 
 All OpenMCP services respect the MCP spec receipts listed in `docs/mcp/core/` and `docs/mcp/capabilities/`.
-When the framework offers optional behaviour (e.g., list-change notifications, subscriptions), the
+When the framework offers optional behavior (e.g., list-change notifications, subscriptions), the
 configuration defaults mirror the spec’s SHOULD/SHOULD NOT guidance.
 
 ## Capabilities at a Glance
@@ -56,5 +56,5 @@ configuration defaults mirror the spec’s SHOULD/SHOULD NOT guidance.
 | Authorization  | `src/openmcp/server/authorization.py` (opt-in scaffolding)    | `docs/openmcp/manual/security.md` |
 | Transports     | `src/openmcp/server/transports/*`, `src/openmcp/client/transports.py` | `docs/openmcp/manual/server.md` |
 
-The following sections dive into server behaviour, client behaviour, configuration, operational
+The following sections dive into server behavior, client behavior, configuration, operational
 security, and a gallery of end-to-end examples.

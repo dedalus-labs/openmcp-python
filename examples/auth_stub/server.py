@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Authorization scaffold demo.
 
 Run:
@@ -6,7 +12,7 @@ Run:
 
 Then call with the demo token:
 
-    curl -H "Authorization: Bearer demo-token" http://127.0.0.1:3000/mcp
+    curl -H "Authorization: Bearer demo-token" http://127.0.0.1:8000/mcp
 """
 
 from __future__ import annotations
@@ -20,9 +26,7 @@ from openmcp.server.authorization import AuthorizationContext, AuthorizationErro
 server = MCPServer(
     "auth-demo",
     authorization=AuthorizationConfig(
-        enabled=True,
-        required_scopes=["mcp:read"],
-        authorization_servers=["https://as.dedaluslabs.ai"],
+        enabled=True, required_scopes=["mcp:read"], authorization_servers=["https://as.dedaluslabs.ai"]
     ),
 )
 

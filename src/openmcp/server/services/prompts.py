@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Prompt capability service.
 
 Implements the spec receipts documented in:
@@ -10,26 +16,21 @@ Implements the spec receipts documented in:
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 
 from mcp.shared.exceptions import McpError
 
-from ...context import context_scope
-from ...prompt import PromptSpec, extract_prompt_spec
-from ... import types
-from ...utils import maybe_await_with_args
 from ..notifications import NotificationSink, ObserverRegistry
 from ..pagination import paginate_sequence
+from ... import types
+from ...context import context_scope
+from ...prompt import PromptSpec, extract_prompt_spec
+from ...utils import maybe_await_with_args
 
 
 class PromptsService:
-    def __init__(
-        self,
-        *,
-        logger,
-        pagination_limit: int,
-        notification_sink: NotificationSink,
-    ) -> None:
+    def __init__(self, *, logger, pagination_limit: int, notification_sink: NotificationSink) -> None:
         self._logger = logger
         self._pagination_limit = pagination_limit
         self._prompt_specs: dict[str, PromptSpec] = {}
@@ -55,42 +56,26 @@ class PromptsService:
         self.observers.remember_current_session()
         return types.ListPromptsResult(prompts=page, nextCursor=next_cursor)
 
-    async def get_prompt(
-        self,
-        name: str,
-        arguments: dict[str, str] | None,
-    ) -> types.GetPromptResult:
+    async def get_prompt(self, name: str, arguments: dict[str, str] | None) -> types.GetPromptResult:
         spec = self._prompt_specs.get(name)
         if spec is None:
-            raise McpError(
-                types.ErrorData(
-                    code=types.INVALID_PARAMS,
-                    message=f"Prompt '{name}' is not registered",
-                )
-            )
+            raise McpError(types.ErrorData(code=types.INVALID_PARAMS, message=f"Prompt '{name}' is not registered"))
 
         provided = dict(arguments or {})
         missing = [arg.name for arg in (spec.arguments or []) if arg.required and arg.name not in provided]
         if missing:
             raise McpError(
                 types.ErrorData(
-                    code=types.INVALID_PARAMS,
-                    message=f"Missing required arguments: {', '.join(sorted(missing))}",
+                    code=types.INVALID_PARAMS, message=f"Missing required arguments: {', '.join(sorted(missing))}"
                 )
             )
 
         try:
             try:
                 with context_scope():
-                    rendered = await maybe_await_with_args(
-                        spec.fn,
-                        provided if spec.arguments else provided,
-                    )  # type: ignore[arg-type]
+                    rendered = await maybe_await_with_args(spec.fn, provided if spec.arguments else provided)  # type: ignore[arg-type]
             except LookupError:
-                rendered = await maybe_await_with_args(
-                    spec.fn,
-                    provided if spec.arguments else provided,
-                )  # type: ignore[arg-type]
+                rendered = await maybe_await_with_args(spec.fn, provided if spec.arguments else provided)  # type: ignore[arg-type]
         except TypeError as exc:
             raise TypeError(str(exc)) from exc
 
@@ -123,10 +108,7 @@ class PromptsService:
             if messages is None:
                 raise TypeError("Prompt mapping must include 'messages'")
             description = result.get("description", spec.description)
-            return types.GetPromptResult(
-                messages=self._coerce_prompt_messages(messages),
-                description=description,
-            )
+            return types.GetPromptResult(messages=self._coerce_prompt_messages(messages), description=description)
 
         if result is None:
             return types.GetPromptResult(messages=[], description=spec.description)
@@ -134,10 +116,7 @@ class PromptsService:
         if isinstance(result, str):
             raise TypeError("Prompt renderer returned raw string; supply role + content.")
 
-        return types.GetPromptResult(
-            messages=self._coerce_prompt_messages(result),
-            description=spec.description,
-        )
+        return types.GetPromptResult(messages=self._coerce_prompt_messages(result), description=spec.description)
 
     def _coerce_prompt_messages(self, values: Iterable[Any]) -> list[types.PromptMessage]:
         messages: list[types.PromptMessage] = []
@@ -165,13 +144,7 @@ class PromptsService:
     def _coerce_prompt_content(self, content: Any) -> types.ContentBlock:
         if isinstance(
             content,
-            (
-                types.TextContent,
-                types.ImageContent,
-                types.AudioContent,
-                types.ResourceLink,
-                types.EmbeddedResource,
-            ),
+            (types.TextContent, types.ImageContent, types.AudioContent, types.ResourceLink, types.EmbeddedResource),
         ):
             return content
 

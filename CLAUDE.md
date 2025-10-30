@@ -18,7 +18,7 @@ codebase.
    - No blanket helpers that obscure JSON-RPC semantics.
    - Keep decorators thin; let `mcp.types` enforce schema shape.
 
-3. **Receipt-based development.** Every public API or behaviour should name the
+3. **Receipt-based development.** Every public API or behavior should name the
    spec clause that motivated it.  Use docstrings or comments that reference the
    path in `docs/mcp/spec`.  Examples: “see `tools/list` description in
    `docs/mcp/spec/schema-reference/tools-list.md`”.
@@ -51,7 +51,7 @@ codebase.
 ## Workflow notes
 
 - Treat `references/python-sdk` as the source of truth for transports and
-  JSON-RPC message types.  We patch behaviour only when we have a spec section to
+  JSON-RPC message types.  We patch behavior only when we have a spec section to
   justify the divergence.
 - Prefer ambient registration (contextvars/AsyncLocalStorage) rather than
   instance decorators.  This keeps the authoring experience consistent with the

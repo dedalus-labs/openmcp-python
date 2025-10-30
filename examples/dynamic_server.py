@@ -1,3 +1,11 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
+from __future__ import annotations
+
 import json
 from typing import Any
 
@@ -52,8 +60,8 @@ async def webhook_listener(port: int) -> None:
     async with listeners:
         await listeners.serve(handle_client)
     async with create_task_group() as tg:
-        tg.start_soon(server.serve, transport="streamable-http", port=3000)
-        tg.start_soon(webhook_listener, 8080)
+        tg.start_soon(server.serve, transport="streamable-http", port=8000)
+        tg.start_soon(webhook_listener, 8000)
 
 
 if __name__ == "__main__":

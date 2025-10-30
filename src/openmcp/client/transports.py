@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """HTTP transport helpers for :mod:`openmcp.client`.
 
 This module provides variants of the streamable HTTP transport described in the
@@ -5,21 +11,22 @@ Model Context Protocol specification (see
 ``docs/mcp/core/transports/streamable-http.md``).  ``lambda_http_client`` mirrors
 the reference SDK implementation but deliberately avoids registering a
 server-push GET stream so that it works with stateless environments such as AWS
-Lambda.  The behaviour aligns with the "POST-only" pattern noted in the spec's
+Lambda.  The behavior aligns with the "POST-only" pattern noted in the spec's
 server guidance and our notes in ``docs/openmcp/transports.md``.
 """
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from typing import AsyncGenerator, Callable
 
 import anyio
-import httpx
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+import httpx
 
 from .._sdk_loader import ensure_sdk_importable
+
 
 ensure_sdk_importable()
 
@@ -67,7 +74,6 @@ async def lambda_http_client(
         Tuple of ``(read_stream, write_stream, get_session_id)`` compatible with
         :class:`mcp.client.session.ClientSession`.
     """
-
     transport = StreamableHTTPTransport(url, headers, timeout, sse_read_timeout, auth)
 
     read_writer, read_stream = anyio.create_memory_object_stream[SessionMessage | Exception](0)
@@ -80,17 +86,12 @@ async def lambda_http_client(
                 timeout=httpx.Timeout(transport.timeout, read=transport.sse_read_timeout),
                 auth=transport.auth,
             ) as client:
+
                 def _noop_start_get_stream() -> None:
                     """Lambda-safe placeholder that intentionally avoids SSE."""
 
                 tg.start_soon(
-                    transport.post_writer,
-                    client,
-                    write_reader,
-                    read_writer,
-                    write_stream,
-                    _noop_start_get_stream,
-                    tg,
+                    transport.post_writer, client, write_reader, read_writer, write_stream, _noop_start_get_stream, tg
                 )
 
                 try:

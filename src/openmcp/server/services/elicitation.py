@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Elicitation capability adapter.
 
 Spec receipts:
@@ -11,11 +17,11 @@ from dataclasses import dataclass
 from typing import Any
 
 import anyio
+from mcp.server.lowlevel.server import request_ctx
+from mcp.shared.exceptions import McpError
 
 from ... import types
 from ...utils import get_logger
-from mcp.server.lowlevel.server import request_ctx
-from mcp.shared.exceptions import McpError
 
 
 DEFAULT_TIMEOUT = 60.0
@@ -40,8 +46,7 @@ class ElicitationService:
         if not session.check_client_capability(types.ClientCapabilities(elicitation=types.ElicitationCapability())):
             raise McpError(
                 types.ErrorData(
-                    code=types.METHOD_NOT_FOUND,
-                    message="Client does not advertise the elicitation capability",
+                    code=types.METHOD_NOT_FOUND, message="Client does not advertise the elicitation capability"
                 )
             )
 
@@ -55,10 +60,7 @@ class ElicitationService:
         except TimeoutError:
             state.failures += 1
             raise McpError(
-                types.ErrorData(
-                    code=types.INTERNAL_ERROR,
-                    message="elicitation request timed out",
-                )
+                types.ErrorData(code=types.INTERNAL_ERROR, message="elicitation request timed out")
             ) from None
         except McpError as exc:
             state.failures += 1
@@ -76,19 +78,13 @@ class ElicitationService:
 
     def _validate_schema(self, requested: dict[str, Any]) -> None:
         if requested.get("type") != "object":
-            raise McpError(
-                types.ErrorData(
-                    code=types.INVALID_PARAMS,
-                    message="requestedSchema.type must be 'object'",
-                )
-            )
+            raise McpError(types.ErrorData(code=types.INVALID_PARAMS, message="requestedSchema.type must be 'object'"))
 
         properties = requested.get("properties")
         if not isinstance(properties, dict) or not properties:
             raise McpError(
                 types.ErrorData(
-                    code=types.INVALID_PARAMS,
-                    message="requestedSchema.properties must be a non-empty object",
+                    code=types.INVALID_PARAMS, message="requestedSchema.properties must be a non-empty object"
                 )
             )
 
@@ -97,8 +93,7 @@ class ElicitationService:
             if not isinstance(schema, dict):
                 raise McpError(
                     types.ErrorData(
-                        code=types.INVALID_PARAMS,
-                        message=f"Schema for property '{name}' must be an object",
+                        code=types.INVALID_PARAMS, message=f"Schema for property '{name}' must be an object"
                     )
                 )
             schema_type = schema.get("type")

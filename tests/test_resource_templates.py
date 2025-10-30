@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Resource template tests (spec receipts: resources-templates-list)."""
 
 from __future__ import annotations
@@ -13,11 +19,8 @@ async def test_resource_template_registration():
     server = MCPServer("template-demo")
 
     with server.binding():
-        @resource_template(
-            "docs",
-            uri_template="resource://docs/{path}",
-            description="Documentation files",
-        )
+
+        @resource_template("docs", uri_template="resource://docs/{path}", description="Documentation files")
         def _docs():
             return None
 
@@ -76,9 +79,7 @@ async def test_resource_template_pagination():
 
     for idx in range(120):
         spec = ResourceTemplateSpec(
-            name=f"tmpl-{idx:03d}",
-            uri_template=f"resource://tmpl/{idx:03d}/{{id}}",
-            description=f"Template {idx}",
+            name=f"tmpl-{idx:03d}", uri_template=f"resource://tmpl/{idx:03d}/{{id}}", description=f"Template {idx}"
         )
         server.register_resource_template(spec)
 

@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """STDIO transport adapter built on the reference MCP SDK.
 
 Implements the framing rules from ``docs/mcp/core/transports/stdio.md`` by
@@ -7,15 +13,13 @@ JSON-RPC traffic over ``stdin``/``stdout``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from ..._sdk_loader import ensure_sdk_importable
 from .base import BaseTransport
+from ..._sdk_loader import ensure_sdk_importable
+
 
 ensure_sdk_importable()
 
-if TYPE_CHECKING:  # pragma: no cover - import cycle guard
-    from ..app import MCPServer
+from mcp.server.stdio import stdio_server
 
 
 def get_stdio_server():
@@ -23,14 +27,13 @@ def get_stdio_server():
 
     Separated into a helper so tests can patch it with in-memory transports.
     """
-
-    from mcp.server.stdio import stdio_server
-
     return stdio_server
 
 
 class StdioTransport(BaseTransport):
     """Run an :class:`openmcp.server.app.MCPServer` over STDIO."""
+
+    TRANSPORT = ("stdio", "STDIO", "Standard IO")
 
     async def run(self, *, raise_exceptions: bool = False, stateless: bool = False) -> None:
         stdio_ctx = get_stdio_server()
@@ -38,9 +41,5 @@ class StdioTransport(BaseTransport):
 
         async with stdio_ctx() as (read_stream, write_stream):
             await self.server.run(
-                read_stream,
-                write_stream,
-                init_options,
-                raise_exceptions=raise_exceptions,
-                stateless=stateless,
+                read_stream, write_stream, init_options, raise_exceptions=raise_exceptions, stateless=stateless
             )

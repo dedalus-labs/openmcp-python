@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Resource template registration utilities for OpenMCP.
 
 Follows ``docs/mcp/spec/schema-reference/resources-templates-list.md``.
@@ -5,16 +11,18 @@ Follows ``docs/mcp/spec/schema-reference/resources-templates-list.md``.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
-from collections.abc import Iterable, Mapping
 
 from . import types
+
 
 if types:  # pragma: no cover
     types.ResourceTemplate  # noqa: B018
 
 from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:  # pragma: no cover
     from .server import MCPServer
@@ -54,17 +62,14 @@ class ResourceTemplateSpec:
 
 
 _TEMPLATE_ATTR = "__openmcp_resource_template__"
-_ACTIVE_SERVER: ContextVar["MCPServer | None"] = ContextVar(
-    "_openmcp_resource_template_server",
-    default=None,
-)
+_ACTIVE_SERVER: ContextVar[MCPServer | None] = ContextVar("_openmcp_resource_template_server", default=None)
 
 
-def get_active_server() -> "MCPServer | None":
+def get_active_server() -> MCPServer | None:
     return _ACTIVE_SERVER.get()
 
 
-def set_active_server(server: "MCPServer") -> object:
+def set_active_server(server: MCPServer) -> object:
     return _ACTIVE_SERVER.set(server)
 
 

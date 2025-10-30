@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Authorization scaffolding for Streamable HTTP transports.
 
 This module prepares OpenMCP for an OAuth 2.1 protected-resource flow without
@@ -16,10 +22,12 @@ real authorization server once available.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Protocol
 
 from ..utils import get_logger
+
 
 try:  # starlette is optional – only required for streamable HTTP deployments
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -40,9 +48,7 @@ class AuthorizationConfig:
 
     enabled: bool = False
     metadata_path: str = "/.well-known/oauth-protected-resource"
-    authorization_servers: list[str] = field(
-        default_factory=lambda: ["https://as.dedaluslabs.ai"]
-    )
+    authorization_servers: list[str] = field(default_factory=lambda: ["https://as.dedaluslabs.ai"])
     required_scopes: list[str] = field(default_factory=list)
     cache_ttl: int = 300
     fail_open: bool = False
@@ -74,11 +80,7 @@ class _NoopAuthorizationProvider:
 class AuthorizationManager:
     """Coordinates metadata serving and ASGI middleware for authorization."""
 
-    def __init__(
-        self,
-        config: AuthorizationConfig,
-        provider: AuthorizationProvider | None = None,
-    ) -> None:
+    def __init__(self, config: AuthorizationConfig, provider: AuthorizationProvider | None = None) -> None:
         self.config = config
         self._provider: AuthorizationProvider = provider or _NoopAuthorizationProvider()
         self._logger = get_logger("openmcp.authorization")
@@ -132,13 +134,11 @@ class AuthorizationManager:
                     return await call_next(request)
                 except AuthorizationError as exc:
                     manager._logger.warning(
-                        "authorization failed",
-                        extra={"event": "auth.jwt.reject", "reason": str(exc)},
+                        "authorization failed", extra={"event": "auth.jwt.reject", "reason": str(exc)}
                     )
                     if manager.config.fail_open:
                         manager._logger.warning(
-                            "authorization fail-open engaged; allowing request",
-                            extra={"event": "auth.fail_open"},
+                            "authorization fail-open engaged; allowing request", extra={"event": "auth.fail_open"}
                         )
                         request.scope["openmcp.auth"] = None
                         return await call_next(request)
@@ -154,14 +154,12 @@ class AuthorizationManager:
         if JSONResponse is None:  # pragma: no cover
             raise RuntimeError("starlette must be installed to use HTTP authorization")
 
-        challenge = (
-            f'Bearer error="invalid_token", authorization_uri="{self.config.metadata_path}"'
-        )
+        challenge = f'Bearer error="invalid_token", authorization_uri="{self.config.metadata_path}"'
         headers = {"WWW-Authenticate": challenge}
         payload = {"error": "unauthorized", "detail": reason}
         return JSONResponse(payload, status_code=401, headers=headers)
 
-    def _canonical_resource(self, request: "Request") -> str:
+    def _canonical_resource(self, request: Request) -> str:
         # Construct scheme://host[:port] without trailing slash
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
         host = request.headers.get("x-forwarded-host", request.headers.get("host", ""))

@@ -1,10 +1,15 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 from mcp.shared.exceptions import McpError
+import pytest
 
 from openmcp import MCPServer, types
 from tests.helpers import run_with_context
@@ -34,11 +39,7 @@ async def test_elicitation_requires_capability() -> None:
 
     params = types.ElicitRequestParams(
         message="Provide a value",
-        requestedSchema={
-            "type": "object",
-            "properties": {"value": {"type": "string"}},
-            "required": ["value"],
-        },
+        requestedSchema={"type": "object", "properties": {"value": {"type": "string"}}, "required": ["value"]},
     )
 
     with pytest.raises(McpError) as exc:
@@ -53,11 +54,7 @@ async def test_elicitation_happy_path_records_call() -> None:
     session = FakeSession(result)
 
     params = types.ElicitRequestParams(
-        message="Provide a value",
-        requestedSchema={
-            "type": "object",
-            "properties": {"value": {"type": "string"}},
-        },
+        message="Provide a value", requestedSchema={"type": "object", "properties": {"value": {"type": "string"}}}
     )
 
     response = await run_with_context(session, server.request_elicitation, params)
@@ -73,11 +70,7 @@ async def test_elicitation_propagates_client_error() -> None:
     session = FakeSession(error)
 
     params = types.ElicitRequestParams(
-        message="Provide a value",
-        requestedSchema={
-            "type": "object",
-            "properties": {"value": {"type": "string"}},
-        },
+        message="Provide a value", requestedSchema={"type": "object", "properties": {"value": {"type": "string"}}}
     )
 
     with pytest.raises(McpError) as exc:
@@ -90,10 +83,7 @@ async def test_elicitation_schema_validation() -> None:
     server = MCPServer("elicitation")
     session = FakeSession(types.ElicitResult(action="accept", content={}))
 
-    bad_params = types.ElicitRequestParams(
-        message="Provide",
-        requestedSchema={"type": "object", "properties": {}},
-    )
+    bad_params = types.ElicitRequestParams(message="Provide", requestedSchema={"type": "object", "properties": {}})
 
     with pytest.raises(McpError):
         await run_with_context(session, server.request_elicitation, bad_params)

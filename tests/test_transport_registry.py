@@ -1,11 +1,19 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
-import pytest
+from typing import Any
 
 from mcp.server.transport_security import TransportSecuritySettings
+import pytest
 
 from openmcp.server import MCPServer
-from openmcp.server.transports import BaseTransport, StreamableHTTPTransport, _validate_transport_headers
+from openmcp.server.transports import BaseTransport, StreamableHTTPTransport
+from openmcp.server.transports._starlette import SessionManagerHandler
 
 
 class DummyTransport(BaseTransport):
@@ -13,7 +21,7 @@ class DummyTransport(BaseTransport):
         super().__init__(server)
         self.calls = calls
 
-    async def run(self, **kwargs) -> None:  # pragma: no cover - exercised in tests
+    async def run(self, **kwargs: Any) -> None:
         self.calls["called"] = True
         self.calls["kwargs"] = kwargs
 
@@ -33,7 +41,7 @@ async def test_register_custom_transport_invoked() -> None:
 
 def test_default_http_security_settings() -> None:
     server = MCPServer("security-defaults")
-    settings = server._http_security_settings  # internal detail, intentional
+    settings = server._http_security_settings  # internal detail, intentional  # noqa: SLF001
 
     assert settings.enable_dns_rebinding_protection is True
     assert "127.0.0.1:*" in settings.allowed_hosts
@@ -47,35 +55,35 @@ def test_http_security_override() -> None:
 
     server = MCPServer("security-override", http_security=override)
 
-    assert server._http_security_settings is override
+    assert server._http_security_settings is override  # noqa: SLF001
 
-    transport = server._transport_for_name("streamable-http")
+    transport = server._transport_for_name("streamable-http")  # noqa: SLF001
     assert isinstance(transport, StreamableHTTPTransport)
-    assert transport._security_settings is override
+    assert transport._security_settings is override  # noqa: SLF001
 
     server.configure_streamable_http_security(None)
-    assert server._http_security_settings != override
+    assert server._http_security_settings != override  # noqa: SLF001
 
 
-def test_validate_transport_headers_requires_protocol() -> None:
-    class DummyRequest:
-        def __init__(self, headers: dict[str, str]) -> None:
-            self.headers = headers
+@pytest.mark.anyio
+async def test_streamable_http_application_rejects_non_http_scope() -> None:
+    class DummyManager:
+        async def handle_request(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - defensive
+            message = "handle_request should not be invoked for non-http scopes"
+            raise AssertionError(message)
 
-    request = DummyRequest({})
-    error = _validate_transport_headers(request, b"{}")
-    assert error == "Bad Request: Missing MCP-Protocol-Version header"
+    app = SessionManagerHandler(
+        session_manager=DummyManager(), transport_label="Streamable HTTP transport", allowed_scopes=("http",)
+    )
 
+    async def receive() -> dict[str, object]:  # pragma: no cover - never called
+        return {"type": "http.disconnect"}
 
-def test_validate_transport_headers_requires_session_for_non_initialize() -> None:
-    class DummyRequest:
-        def __init__(self, headers: dict[str, str]) -> None:
-            self.headers = headers
+    async def send(_message: dict[str, object]) -> None:  # pragma: no cover - never called
+        message = "send should not be invoked for non-http scopes"
+        raise AssertionError(message)
 
-    request = DummyRequest({"MCP-Protocol-Version": "2025-06-18"})
-    error = _validate_transport_headers(request, b"{}")
-    assert error == "Bad Request: Missing Mcp-Session-Id header"
+    with pytest.raises(TypeError) as excinfo:
+        await app({"type": "lifespan"}, receive, send)
 
-    # initialization requests are exempt
-    body = b'{"jsonrpc": "2.0", "method": "initialize"}'
-    assert _validate_transport_headers(request, body) is None
+    assert "Streamable HTTP" in str(excinfo.value)

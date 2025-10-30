@@ -1,11 +1,11 @@
 # Configuration Reference
 
 This appendix documents every tunable parameter exposed by OpenMCP. Tables include defaults,
-validation rules, and behavioural notes.
+validation rules, and behavioral notes.
 
 ## MCPServer Parameters
 
-| Name | Default | Behaviour |
+| Name | Default | behavior |
 | ---- | ------- | --------- |
 | `name` | — | Advertised identifier (required). |
 | `version` | `None` | Optional string included in initialization response. |
@@ -22,7 +22,7 @@ validation rules, and behavioural notes.
 
 ### AuthorizationConfig
 
-| Field | Default | Behaviour |
+| Field | Default | behavior |
 | ----- | ------- | --------- |
 | `enabled` | `False` | When `True`, the server serves PRM and enforces bearer tokens. |
 | `metadata_path` | `"/.well-known/oauth-protected-resource"` | Route at which PRM is served. |
@@ -33,7 +33,7 @@ validation rules, and behavioural notes.
 
 ### TransportSecuritySettings (subset)
 
-| Field | Default | Behaviour |
+| Field | Default | behavior |
 | ----- | ------- | --------- |
 | `enable_dns_rebinding_protection` | `True` | Rejects Host headers that do not match allowed list. |
 | `allowed_hosts` | `["127.0.0.1:*", "localhost:*"]` | Additional allowed host:port pairs. |
@@ -41,7 +41,7 @@ validation rules, and behavioural notes.
 
 ### Ping Service Thresholds
 
-| Attribute | Default | Behaviour |
+| Attribute | Default | behavior |
 | --------- | ------- | --------- |
 | `interval` | `5.0` seconds | Heartbeat cadence. |
 | `jitter` | `0.2` (20%) | Randomisation to avoid thundering herd. |
@@ -51,7 +51,7 @@ validation rules, and behavioural notes.
 
 ### Sampling Service
 
-| Attribute | Default | Behaviour |
+| Attribute | Default | behavior |
 | --------- | ------- | --------- |
 | `timeout` | `60.0` seconds | Maximum wait for a client sampling response. |
 | `max_concurrent` | `4` | Concurrency guard per client session. |
@@ -60,20 +60,20 @@ validation rules, and behavioural notes.
 
 ### Elicitation Service
 
-| Attribute | Default | Behaviour |
+| Attribute | Default | behavior |
 | --------- | ------- | --------- |
 | `timeout` | `60.0` seconds | Maximum wait for elicitation responses. |
 
 ## MCPClient Parameters
 
-| Name | Default | Behaviour |
+| Name | Default | behavior |
 | ---- | ------- | --------- |
 | `capabilities` | `ClientCapabilitiesConfig()` | Enables optional features (roots, sampling, elicitation, logging). |
 | `client_info` | `None` | Advertised via `initialize`. |
 
 ### ClientCapabilitiesConfig
 
-| Field | Default | Behaviour |
+| Field | Default | behavior |
 | ----- | ------- | --------- |
 | `enable_roots` | `False` | Advertise the `roots` capability. |
 | `initial_roots` | `None` | Iterable of roots to expose immediately. |
@@ -88,13 +88,13 @@ Not yet implemented. Planned fields include:
 - `enabled`: toggle authorization handling.
 - `token_store`: pluggable persistence (in-memory, file-based, custom).
 - `client_registration`: settings for dynamic client registration.
-- `http_client`: override to customise retry/backoff behaviour.
+- `http_client`: override to customise retry/backoff behavior.
 
 See `docs/openmcp/design/authorization.md` for the forthcoming design.
 
 ## Environment Variables
 
-| Variable | Behaviour |
+| Variable | behavior |
 | -------- | --------- |
 | `OPENMCP_LOG_LEVEL` | Overrides the default Python logging level (`INFO`). |
 | `OPENMCP_PROGRESS_LOG_LEVEL` | Sets the logger level for progress telemetry (`DEBUG` by default). |
@@ -107,4 +107,4 @@ See `docs/openmcp/design/authorization.md` for the forthcoming design.
 - Progress emission: 8 Hz (can be adjusted via `set_default_progress_config`).
 - Authorization: disabled unless `AuthorizationConfig.enabled` is set.
 
-Refer back to the server/client guides for behavioural context and example usage.
+Refer back to the server/client guides for behavioral context and example usage.

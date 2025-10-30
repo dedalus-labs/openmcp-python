@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Resource capability service (resources, templates, subscriptions).
 
 Spec receipts covered here:
@@ -6,21 +12,22 @@ Spec receipts covered here:
 - ``docs/mcp/spec/schema-reference/resources-list.md`` / ``resources-read.md``
 - ``docs/mcp/spec/schema-reference/resources-templates-list.md``
 - ``docs/mcp/spec/schema-reference/resources-subscribe.md``
-- ``docs/mcp/capabilities/pagination`` for cursor behaviour
+- ``docs/mcp/capabilities/pagination`` for cursor behavior
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable
+from collections.abc import Callable
+from typing import Any
 
-from ...context import context_scope
-from ...resource import ResourceSpec, extract_resource_spec
-from ...resource_template import ResourceTemplateSpec, extract_resource_template_spec
-from ... import types
 from ..adapters import normalize_resource_payload
 from ..notifications import NotificationSink, ObserverRegistry
 from ..pagination import paginate_sequence
 from ..subscriptions import SubscriptionManager
+from ... import types
+from ...context import context_scope
+from ...resource import ResourceSpec, extract_resource_spec
+from ...resource_template import ResourceTemplateSpec, extract_resource_template_spec
 
 
 class ResourcesService:
@@ -54,14 +61,9 @@ class ResourcesService:
         self._refresh_resources()
         return spec
 
-    def register_template(
-        self,
-        target: ResourceTemplateSpec | Callable[..., Any],
-    ) -> ResourceTemplateSpec:
+    def register_template(self, target: ResourceTemplateSpec | Callable[..., Any]) -> ResourceTemplateSpec:
         spec = (
-            target
-            if isinstance(target, ResourceTemplateSpec)
-            else extract_resource_template_spec(target)  # type: ignore[arg-type]
+            target if isinstance(target, ResourceTemplateSpec) else extract_resource_template_spec(target)  # type: ignore[arg-type]
         )
         if spec is None:
             raise ValueError("Resource templates must be decorated with @resource_template")
@@ -81,11 +83,7 @@ class ResourcesService:
         return types.ListResourcesResult(resources=page, nextCursor=next_cursor)
 
     async def list_templates(self, cursor: str | None) -> types.ListResourceTemplatesResult:
-        page, next_cursor = paginate_sequence(
-            self._resource_template_defs,
-            cursor,
-            limit=self._pagination_limit,
-        )
+        page, next_cursor = paginate_sequence(self._resource_template_defs, cursor, limit=self._pagination_limit)
         return types.ListResourceTemplatesResult(resourceTemplates=page, nextCursor=next_cursor)
 
     async def read(self, uri: str) -> types.ReadResourceResult:
@@ -101,11 +99,7 @@ class ResourcesService:
                 data = spec.fn()
         except Exception as exc:  # pragma: no cover - defensive
             text = f"Resource error: {exc}"
-            fallback = types.TextResourceContents(
-                uri=uri,
-                mimeType="text/plain",
-                text=text,
-            )
+            fallback = types.TextResourceContents(uri=uri, mimeType="text/plain", text=text)
             return types.ReadResourceResult(contents=[fallback])
 
         normalized = normalize_resource_payload(uri, spec.mime_type, data)
@@ -127,9 +121,7 @@ class ResourcesService:
             return
 
         notification = types.ServerNotification(
-            types.ResourceUpdatedNotification(
-                params=types.ResourceUpdatedNotificationParams(uri=uri),
-            )
+            types.ResourceUpdatedNotification(params=types.ResourceUpdatedNotificationParams(uri=uri))
         )
 
         stale: list[Any] = []
@@ -137,11 +129,7 @@ class ResourcesService:
             try:
                 await self._sink.send_notification(session, notification)
             except Exception as exc:  # pragma: no cover - defensive
-                self._logger.warning(
-                    "Failed to notify subscriber %s: %s",
-                    getattr(session, "name", repr(session)),
-                    exc,
-                )
+                self._logger.warning("Failed to notify subscriber %s: %s", getattr(session, "name", repr(session)), exc)
                 stale.append(session)
 
         for session in stale:
@@ -179,10 +167,7 @@ class ResourcesService:
         self._resource_defs.clear()
         for spec in self._resource_specs.values():
             self._resource_defs[spec.uri] = types.Resource(
-                uri=spec.uri,
-                name=spec.name or spec.uri,
-                description=spec.description,
-                mimeType=spec.mime_type,
+                uri=spec.uri, name=spec.name or spec.uri, description=spec.description, mimeType=spec.mime_type
             )
 
     def _refresh_templates(self) -> None:

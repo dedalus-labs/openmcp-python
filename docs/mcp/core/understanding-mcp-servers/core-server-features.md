@@ -200,7 +200,7 @@ Prompts provide structured templates for common tasks. In the travel planning co
 Rather than unstructured natural language input, the prompt system enables:
 
 1. Selection of the "Plan a vacation" template
-2. Structured input: Barcelona, 7 days, \$3000, \["beaches", "architecture", "food"]
+2. Structured input: Barcelona, 7 days, \$8000, \["beaches", "architecture", "food"]
 3. Consistent workflow execution based on the template
 
 #### User Interaction Model

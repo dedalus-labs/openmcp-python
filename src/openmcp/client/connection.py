@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """High-level client entrypoint.
 
 `open_connection` wraps transport selection and :class:`~openmcp.client.MCPClient`
@@ -12,13 +18,14 @@ the lower-level helpers directly.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from typing import AsyncGenerator, Callable, Mapping
 
 import httpx
 
 from .._sdk_loader import ensure_sdk_importable
+
 
 ensure_sdk_importable()
 
@@ -30,10 +37,11 @@ from mcp.shared._httpx_utils import (  # type: ignore  # noqa: E402
     McpHttpClientFactory,
     create_mcp_http_client,
 )
-from mcp.types import Implementation, LATEST_PROTOCOL_VERSION  # type: ignore  # noqa: E402
+from mcp.types import LATEST_PROTOCOL_VERSION, Implementation  # type: ignore  # noqa: E402
 
 from .app import ClientCapabilitiesConfig, MCPClient
 from .transports import lambda_http_client
+
 
 StreamableHTTPNames = {"streamable-http", "streamable_http", "shttp", "http"}
 LambdaHTTPNames = {"lambda-http", "lambda_http"}
@@ -73,7 +81,6 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
     transport_kwargs:
         Extra keyword arguments forwarded to the underlying transport helper.
     """
-
     selected = transport.lower()
 
     if selected in StreamableHTTPNames:
@@ -84,23 +91,20 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
         if headers:
             base_headers.update(headers)
 
-        async with streamablehttp_client(
-            target,
-            headers=base_headers,
-            timeout=timeout,
-            sse_read_timeout=sse_read_timeout,
-            terminate_on_close=terminate_on_close,
-            httpx_client_factory=httpx_client_factory,
-            auth=auth,
-            **transport_kwargs,
-        ) as (read_stream, write_stream, _):
-            async with MCPClient(
-                read_stream,
-                write_stream,
-                capabilities=capabilities,
-                client_info=client_info,
-            ) as client:
-                yield client
+        async with (
+            streamablehttp_client(
+                target,
+                headers=base_headers,
+                timeout=timeout,
+                sse_read_timeout=sse_read_timeout,
+                terminate_on_close=terminate_on_close,
+                httpx_client_factory=httpx_client_factory,
+                auth=auth,
+                **transport_kwargs,
+            ) as (read_stream, write_stream, _),
+            MCPClient(read_stream, write_stream, capabilities=capabilities, client_info=client_info) as client,
+        ):
+            yield client
         return
 
     if selected in LambdaHTTPNames:
@@ -108,23 +112,20 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
         if headers:
             base_headers.update(headers)
 
-        async with lambda_http_client(
-            target,
-            headers=base_headers,
-            timeout=timeout,
-            sse_read_timeout=sse_read_timeout,
-            terminate_on_close=terminate_on_close,
-            httpx_client_factory=httpx_client_factory,
-            auth=auth,
-            **transport_kwargs,
-        ) as (read_stream, write_stream, _):
-            async with MCPClient(
-                read_stream,
-                write_stream,
-                capabilities=capabilities,
-                client_info=client_info,
-            ) as client:
-                yield client
+        async with (
+            lambda_http_client(
+                target,
+                headers=base_headers,
+                timeout=timeout,
+                sse_read_timeout=sse_read_timeout,
+                terminate_on_close=terminate_on_close,
+                httpx_client_factory=httpx_client_factory,
+                auth=auth,
+                **transport_kwargs,
+            ) as (read_stream, write_stream, _),
+            MCPClient(read_stream, write_stream, capabilities=capabilities, client_info=client_info) as client,
+        ):
+            yield client
         return
 
     raise ValueError(f"Unsupported transport '{transport}'")

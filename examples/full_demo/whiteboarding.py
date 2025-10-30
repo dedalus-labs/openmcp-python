@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Rough UX sketches for the "ambient context" story.
 
 Nothing here runs – it's just the plan for how we want authors to write their
@@ -17,7 +23,7 @@ from openmcp.client import open_connection
 
 async def run_agent():
     async with open_connection(
-        "http://127.0.0.1:3000/mcp",
+        "http://127.0.0.1:8000/mcp",
         transport="streamable-http",  # or "stdio", "lambda-http", ...
         client_info={"name": "demo"},
     ) as client:
@@ -92,3 +98,5 @@ Open questions
 - For the client helper, do we expose `client.session` (raw SDK) or only our
   façade?  Current leaning: expose both but document the common path.
 """
+
+from __future__ import annotations

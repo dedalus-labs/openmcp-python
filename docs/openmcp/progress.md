@@ -23,7 +23,7 @@ token is absent the helper raises `ValueError`, which surfaces to the client as
 an MCP error response, matching the MCP requirements that tokens reference
 active requests.
 
-## Behavioural Guarantees
+## behavioral Guarantees
 
 * **Monotonic progress** – attempting to regress the progress value raises
   `ValueError` so the wire traffic always satisfies the MCP "progress must
@@ -62,7 +62,7 @@ also exposes `set_default_progress_telemetry()` and
 
 ## Configuration
 
-`ProgressConfig` tunes emission frequency and retry behaviour:
+`ProgressConfig` tunes emission frequency and retry behavior:
 
 ```python
 from openmcp.progress import ProgressConfig, progress

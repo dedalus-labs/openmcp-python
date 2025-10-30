@@ -1,20 +1,29 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Tool capability service."""
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 import inspect
 import types as pytypes
-from typing import Any, Callable, Iterable, NotRequired, TypedDict, get_args, get_origin, get_type_hints
+from typing import Any, NotRequired, TypedDict, get_args, get_origin, get_type_hints
 
 from pydantic import TypeAdapter
 
-from ...context import context_scope
 from ..adapters import normalize_tool_result
-from ...tool import ToolSpec, extract_tool_spec
-from ... import types
-from ...utils import maybe_await_with_args
 from ..notifications import NotificationSink, ObserverRegistry
 from ..pagination import paginate_sequence
+from ... import types
+from ...context import context_scope
+from ...tool import ToolSpec, extract_tool_spec
+from ...utils import maybe_await_with_args
+from ...utils.schema import SchemaError, resolve_output_schema
+
 
 class ToolsService:
     """Manages tool registration, invocation, and list notifications."""
@@ -78,8 +87,7 @@ class ToolsService:
         spec = self._tool_specs.get(name)
         if not spec or name not in self._tool_defs:
             return types.CallToolResult(
-                content=[types.TextContent(type="text", text=f'Tool "{name}" is not available')],
-                isError=True,
+                content=[types.TextContent(type="text", text=f'Tool "{name}" is not available')], isError=True
             )
 
         try:
@@ -90,14 +98,11 @@ class ToolsService:
                 result = await maybe_await_with_args(spec.fn, **arguments)
         except TypeError as exc:  # argument mismatch
             return types.CallToolResult(
-                content=[types.TextContent(type="text", text=f"Invalid arguments: {exc}")],
-                isError=True,
+                content=[types.TextContent(type="text", text=f"Invalid arguments: {exc}")], isError=True
             )
 
         if isinstance(result, types.ServerResult):
-            raise RuntimeError(
-                "Tool returned types.ServerResult; return the nested CallToolResult instead."
-            )
+            raise RuntimeError("Tool returned types.ServerResult; return the nested CallToolResult instead.")
 
         return normalize_tool_result(result)
 
@@ -177,10 +182,7 @@ class ToolsService:
 
         namespace = {"__annotations__": annotations}
         typed_dict = pytypes.new_class(
-            f"{fn.__name__.title()}ToolInput",
-            (TypedDict,),
-            {},
-            lambda ns: ns.update(namespace),
+            f"{fn.__name__.title()}ToolInput", (TypedDict,), {}, lambda ns: ns.update(namespace)
         )
 
         try:
@@ -226,20 +228,13 @@ class ToolsService:
             return None
 
         try:
-            schema = TypeAdapter(annotation).json_schema(mode="serialization")
-        except Exception:
+            envelope = resolve_output_schema(annotation)
+        except SchemaError:
             return None
 
+        schema = envelope.schema
         schema.pop("$defs", None)
         _prune_titles(schema)
-
-        if schema.get("type") != "object":
-            schema = {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {"result": schema},
-                "required": ["result"],
-            }
         return schema
 
 

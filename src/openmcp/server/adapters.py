@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Normalization helpers for server-facing handler results.
 
 The adapters keep the capability services thin while ensuring all outbound
@@ -12,12 +18,13 @@ Spec receipts referenced here:
 from __future__ import annotations
 
 import base64
-import json
 from collections.abc import Iterable
 from dataclasses import asdict, is_dataclass
+import json
 from typing import Any
 
 from .. import types
+
 
 try:  # pragma: no cover - optional import when pydantic is present
     from pydantic import BaseModel
@@ -40,7 +47,6 @@ _JSONIFY_SENTINEL = object()
 
 def normalize_tool_result(value: Any) -> types.CallToolResult:
     """Coerce arbitrary tool handler output into ``CallToolResult``."""
-
     if isinstance(value, types.CallToolResult):
         return value
 
@@ -134,7 +140,6 @@ def _as_text_content(value: Any) -> types.TextContent:
 
 def normalize_resource_payload(uri: str, declared_mime: str | None, payload: Any) -> types.ReadResourceResult:
     """Coerce resource handler output into ``ReadResourceResult``."""
-
     if isinstance(payload, types.ReadResourceResult):
         return payload
 
@@ -177,9 +182,7 @@ def normalize_resource_payload(uri: str, declared_mime: str | None, payload: Any
             text = str(payload)
         else:
             text = json.dumps(json_ready, ensure_ascii=False)
-    return types.ReadResourceResult(
-        contents=[types.TextResourceContents(uri=uri, mimeType=mime, text=text)]
-    )
+    return types.ReadResourceResult(contents=[types.TextResourceContents(uri=uri, mimeType=mime, text=text)])
 
 
 def _jsonify(value: Any, _depth: int = 0) -> Any:

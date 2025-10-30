@@ -1,16 +1,20 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
 
 import anyio
-import pytest
-
 from mcp import types
 from mcp.server.lowlevel.server import request_ctx
 from mcp.shared.context import RequestContext
+import pytest
 
 from openmcp.progress import (
     ProgressCloseEvent,
@@ -42,17 +46,11 @@ class FakeSession:
         total: float | None = None,
         message: str | None = None,
     ) -> None:
-        self.notifications.append(
-            RecordedNotification(progress_token, progress_value, total, message)
-        )
+        self.notifications.append(RecordedNotification(progress_token, progress_value, total, message))
 
 
 @asynccontextmanager
-async def with_request_context(
-    *,
-    token: types.ProgressToken | None,
-    session: FakeSession,
-) -> AsyncIterator[None]:
+async def with_request_context(*, token: types.ProgressToken | None, session: FakeSession) -> AsyncIterator[None]:
     meta = types.RequestParams.Meta(progressToken=token) if token is not None else None
     ctx = RequestContext(request_id=1, meta=meta, session=session, lifespan_context=None)
     token_ctx = request_ctx.set(ctx)
@@ -66,10 +64,9 @@ async def with_request_context(
 async def test_progress_notifications_roundtrip() -> None:
     session = FakeSession()
 
-    async with with_request_context(token="tok", session=session):
-        async with progress(total=3) as tracker:
-            await tracker.advance(1, "step1")
-            await tracker.advance(2, "step3")
+    async with with_request_context(token="tok", session=session), progress(total=3) as tracker:
+        await tracker.advance(1, "step1")
+        await tracker.advance(2, "step3")
 
     assert session.notifications, "expected at least one notification"
     assert session.notifications[-1] == RecordedNotification("tok", 3, 3, "step3")
@@ -91,11 +88,10 @@ async def test_progress_without_token_raises() -> None:
 async def test_progress_monotonicity_violation() -> None:
     session = FakeSession()
 
-    async with with_request_context(token="tok", session=session):
-        async with progress(total=5) as tracker:
-            await tracker.set(2)
-            with pytest.raises(ValueError):
-                await tracker.set(1)
+    async with with_request_context(token="tok", session=session), progress(total=5) as tracker:
+        await tracker.set(2)
+        with pytest.raises(ValueError):
+            await tracker.set(1)
 
 
 @pytest.mark.anyio
@@ -129,9 +125,7 @@ async def test_progress_throttle_event_emitted() -> None:
     session = FakeSession()
     throttled: list[int] = []
 
-    telemetry = ProgressTelemetry(
-        on_throttle=lambda evt: throttled.append(evt.pending_updates),
-    )
+    telemetry = ProgressTelemetry(on_throttle=lambda evt: throttled.append(evt.pending_updates))
 
     async with with_request_context(token="tok", session=session):
         async with progress(total=2, telemetry=telemetry, config=ProgressConfig(emit_hz=1)) as tracker:

@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Full capability demo server.
 
 Run with:
@@ -12,17 +18,13 @@ from typing import Any
 
 import anyio
 
-from openmcp import MCPServer, NotificationFlags, completion, get_context, prompt, resource, tool
-from openmcp import types
+from openmcp import MCPServer, NotificationFlags, completion, get_context, prompt, resource, tool, types
+
 
 server = MCPServer(
     "full-demo",
     instructions="Demonstrates tools/resources/prompts/sampling/elicitation",
-    notification_flags=NotificationFlags(
-        prompts_changed=True,
-        resources_changed=True,
-        tools_changed=True,
-    ),
+    notification_flags=NotificationFlags(prompts_changed=True, resources_changed=True, tools_changed=True),
 )
 
 
@@ -55,21 +57,13 @@ with server.binding():
     @prompt(
         name="plan-vacation",
         description="Guide the model through planning a vacation",
-        arguments=[
-            types.PromptArgument(name="destination", description="Where to travel", required=True),
-        ],
+        arguments=[types.PromptArgument(name="destination", description="Where to travel", required=True)],
     )
     def plan_prompt(args: dict[str, str]) -> list[dict[str, str]]:
         destination = args.get("destination", "unknown")
         return [
-            {
-                "role": "assistant",
-                "content": "You are a helpful planner. Use tools as needed.",
-            },
-            {
-                "role": "user",
-                "content": f"Plan a trip to {destination}.",
-            },
+            {"role": "assistant", "content": "You are a helpful planner. Use tools as needed."},
+            {"role": "user", "content": f"Plan a trip to {destination}."},
         ]
 
     @completion(prompt="plan-vacation")
@@ -82,10 +76,10 @@ async def plan_completion(argument: types.CompletionArgument, context: types.Com
     return ["This is a synthetic completion."]
 
 
-async def sampling_handler(ref: Any, params: types.CreateMessageRequestParams, context: Any) -> types.CreateMessageResult:
-    return types.CreateMessageResult(
-        content=[types.TextContent(type="text", text="Sampled by demo server")]
-    )
+async def sampling_handler(
+    ref: Any, params: types.CreateMessageRequestParams, context: Any
+) -> types.CreateMessageResult:
+    return types.CreateMessageResult(content=[types.TextContent(type="text", text="Sampled by demo server")])
 
 
 server.sampling.create_message = sampling_handler  # demonstration override

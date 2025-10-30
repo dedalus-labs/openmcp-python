@@ -13,7 +13,7 @@ OpenMCP wraps the official MCP reference SDK with ergonomic decorators, automati
 - Ambient registration is real: drop a `@tool` inside `with server.binding():` and it lands on *that* server, nothing global, no reload dance.
 - You can change your mind at runtime—call `allow_tools`, re-run a binding block from a webhook, emit the spec’s listChanged notification, and clients stay in sync.
 - Decorators store concrete `ToolSpec` objects, so the same function can be registered on multiple servers (or tenants) without hidden state.
-- Every control surface points back to a spec citation (`docs/mcp/...`) so you can check what behaviour we’re matching before you ship it.
+- Every control surface points back to a spec citation (`docs/mcp/...`) so you can check what behavior we’re matching before you ship it.
 - Transports and services are just factories; if you don’t like ours, register your own without forking the server.
 - Context objects are plain async helpers (`get_context().progress()`, `get_context().info()`), not opaque singletons, so you can stub them in tests.
 
@@ -57,7 +57,7 @@ with server.binding():
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(server.serve())  # Streamable HTTP on :3000
+    asyncio.run(server.serve())  # Streamable HTTP on :8000
 ```
 
 ### Client
@@ -67,7 +67,7 @@ from openmcp import MCPClient
 from openmcp.client import lambda_http_client
 
 async def main():
-    async with lambda_http_client("http://127.0.0.1:3000/mcp") as (r, w, _):
+    async with lambda_http_client("http://127.0.0.1:8000/mcp") as (r, w, _):
         async with MCPClient(r, w) as client:
             # List tools
             tools = await client.session.list_tools()
@@ -193,7 +193,7 @@ Servers request structured user input. Schema validation (top-level properties o
 
 ## Transports
 
-**Streamable HTTP** (default): `await server.serve()` → `http://127.0.0.1:3000/mcp`. SSE streaming, DNS rebinding protection, origin validation, host allowlists, OAuth metadata endpoint.
+**Streamable HTTP** (default): `await server.serve()` → `http://127.0.0.1:8000/mcp`. SSE streaming, DNS rebinding protection, origin validation, host allowlists, OAuth metadata endpoint.
 
 **STDIO**: `await server.serve(transport="stdio")` for subprocess communication.
 

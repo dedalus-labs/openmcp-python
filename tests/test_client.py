@@ -1,13 +1,19 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
-import types as pytypes
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import anyio
 import pytest
 
-from openmcp.client import ClientCapabilitiesConfig, MCPClient
 from openmcp import types
+from openmcp.client import ClientCapabilitiesConfig, MCPClient
 
 
 class FakeClientSession:
@@ -31,7 +37,7 @@ class FakeClientSession:
         self.roots_notifications = 0
         self.next_result: Any = types.EmptyResult()
 
-    async def __aenter__(self) -> "FakeClientSession":
+    async def __aenter__(self) -> FakeClientSession:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
@@ -163,11 +169,7 @@ async def test_sampling_and_elicitation_handlers_wrapped(monkeypatch: pytest.Mon
         assert isinstance(result, types.CreateMessageResult)
 
         elicit_params = types.ElicitRequestParams(
-            message="Provide",
-            requestedSchema={
-                "type": "object",
-                "properties": {"value": {"type": "string"}},
-            },
+            message="Provide", requestedSchema={"type": "object", "properties": {"value": {"type": "string"}}}
         )
         elicit_result = await session.elicitation_callback(ctx, elicit_params)
         assert isinstance(elicit_result, types.ElicitResult)

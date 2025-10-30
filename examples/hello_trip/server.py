@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Minimal end-to-end MCP server demo.
 
 This example shows how to wire tools, resources, prompts, and transports using
@@ -21,7 +27,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from openmcp import MCPServer, get_context, prompt, resource, tool, types
+from openmcp import MCPServer, get_context, prompt, resource, tool
+
 
 server = MCPServer("hello-trip")
 
@@ -32,19 +39,13 @@ with server.binding():
         tags={"travel", "demo"},
         output_schema={
             "type": "object",
-            "properties": {
-                "summary": {"type": "string"},
-                "suggestion": {"type": "string"},
-            },
+            "properties": {"summary": {"type": "string"}, "suggestion": {"type": "string"}},
             "required": ["summary"],
         },
     )
     async def plan_trip(destination: str, days: int, budget: float) -> dict[str, Any]:
         ctx = get_context()
-        await ctx.info(
-            "planning trip",
-            data={"destination": destination, "days": days, "budget": budget},
-        )
+        await ctx.info("planning trip", data={"destination": destination, "days": days, "budget": budget})
 
         async with ctx.progress(total=3) as tracker:
             await tracker.advance(1, message="Gathering highlights")
@@ -54,10 +55,7 @@ with server.binding():
             await tracker.advance(1, message="Summarising itinerary")
 
         summary = f"Plan: {days} days in {destination} with budget ${budget:.2f}."
-        result = {
-            "summary": summary,
-            "suggestion": "Remember to book tickets early!",
-        }
+        result = {"summary": summary, "suggestion": "Remember to book tickets early!"}
         await ctx.debug("plan complete", data=result)
         return result
 
@@ -73,10 +71,7 @@ with server.binding():
                 "role": "assistant",
                 "content": "You are a helpful travel planner. Summarize the itinerary and call tools if needed.",
             },
-            {
-                "role": "user",
-                "content": f"Plan a vacation to {destination}.",
-            },
+            {"role": "user", "content": f"Plan a vacation to {destination}."},
         ]
 
 
@@ -89,10 +84,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the hello-trip MCP server")
     parser.add_argument(
-        "--transport",
-        default="streamable-http",
-        choices=["streamable-http", "stdio"],
-        help="Transport to use",
+        "--transport", default="streamable-http", choices=["streamable-http", "stdio"], help="Transport to use"
     )
     args = parser.parse_args()
 

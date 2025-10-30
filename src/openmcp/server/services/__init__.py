@@ -1,14 +1,23 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Capability service implementations for MCPServer."""
 
-from .tools import ToolsService
-from .resources import ResourcesService
-from .prompts import PromptsService
+from __future__ import annotations
+
 from .completions import CompletionService
-from .logging import LoggingService
-from .roots import RootsService, RootGuard
-from .sampling import SamplingService
 from .elicitation import ElicitationService
+from .logging import LoggingService
 from .ping import PingService
+from .prompts import PromptsService
+from .resources import ResourcesService
+from .roots import RootGuard, RootsService
+from .sampling import SamplingService
+from .tools import ToolsService
+
 
 __all__ = [
     "ToolsService",

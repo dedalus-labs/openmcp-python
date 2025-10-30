@@ -35,7 +35,7 @@ async def refresh_index() -> None:
 ```
 
 - Spec receipts: `docs/mcp/spec/schema-reference/resources-list.md`, `resources-read.md`, `resources-subscribe.md`
-- Binary results are base64-encoded automatically (see `BlobResourceContents` behaviour in the reference SDK).
+- Binary results are base64-encoded automatically (see `BlobResourceContents` behavior in the reference SDK).
 - `server.notify_resource_updated(uri)` emits `notifications/resources/updated` to every subscriber; invoke it from your mutation hooks or background tasks. See `docs/openmcp/hook-patterns.md` for webhook/background-watcher patterns.
 - To support template discovery (`resources/templates/list`), implement ambient registration for templates or document the omission explicitly.
 - Integration TODO: add transport-level tests (STDIO + Streamable HTTP) to

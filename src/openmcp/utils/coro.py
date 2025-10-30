@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Coroutine helpers shared across OpenMCP services.
 
 These utilities collapse the "maybe await" pattern that appears throughout the
@@ -8,9 +14,10 @@ re-implementing the same inspect/await checks repeatedly.
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Awaitable, Callable
+import inspect
 from typing import Any, TypeVar, overload
+
 
 T = TypeVar("T")
 
@@ -20,18 +27,15 @@ async def noop_coroutine() -> None:
 
 
 @overload
-async def maybe_await(value: T) -> T:
-    ...
+async def maybe_await(value: T) -> T: ...
 
 
 @overload
-async def maybe_await(value: Callable[[], T]) -> T:
-    ...
+async def maybe_await(value: Callable[[], T]) -> T: ...
 
 
 async def maybe_await(value: T | Callable[[], T]) -> T:
     """Evaluate *value* and await the result if necessary."""
-
     if callable(value):
         value = value()
     if inspect.isawaitable(value):
@@ -40,23 +44,15 @@ async def maybe_await(value: T | Callable[[], T]) -> T:
 
 
 @overload
-async def maybe_await_with_args(value: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:
-    ...
+async def maybe_await_with_args(value: Callable[..., T], /, *args: Any, **kwargs: Any) -> T: ...
 
 
 @overload
-async def maybe_await_with_args(value: Awaitable[T] | T, /, *args: Any, **kwargs: Any) -> T:
-    ...
+async def maybe_await_with_args(value: Awaitable[T] | T, /, *args: Any, **kwargs: Any) -> T: ...
 
 
-async def maybe_await_with_args(
-    value: Callable[..., T] | Awaitable[T] | T,
-    /,
-    *args: Any,
-    **kwargs: Any,
-) -> T:
+async def maybe_await_with_args(value: Callable[..., T] | Awaitable[T] | T, /, *args: Any, **kwargs: Any) -> T:
     """Variant of :func:`maybe_await` that forwards ``*args`` / ``**kwargs``."""
-
     if callable(value):
         value = value(*args, **kwargs)
     if inspect.isawaitable(value):

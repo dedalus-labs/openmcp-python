@@ -1,15 +1,20 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Subscription management for resource updates."""
 
 from __future__ import annotations
 
-import contextlib
-import weakref
 from collections import defaultdict
 from collections.abc import Iterable
+import contextlib
 from typing import Any
+import weakref
 
 import anyio
-
 from mcp.server.lowlevel.server import request_ctx
 
 
@@ -21,7 +26,6 @@ class SubscriptionManager:
         self._by_uri: dict[str, weakref.WeakSet[Any]] = defaultdict(weakref.WeakSet)
         self._by_session: weakref.WeakKeyDictionary[Any, set[str]] = weakref.WeakKeyDictionary()
 
-
     async def subscribe_current(self, uri: str) -> None:
         context = _require_context()
         async with self._lock:
@@ -29,7 +33,6 @@ class SubscriptionManager:
             subscribers.add(context.session)
             uris = self._by_session.setdefault(context.session, set())
             uris.add(uri)
-
 
     async def unsubscribe_current(self, uri: str) -> None:
         context = _require_context()
@@ -47,7 +50,6 @@ class SubscriptionManager:
                     with contextlib.suppress(KeyError):
                         del self._by_session[context.session]
 
-
     async def prune_session(self, session: Any) -> None:
         async with self._lock:
             uris = self._by_session.pop(session, None)
@@ -60,14 +62,12 @@ class SubscriptionManager:
                     if not subscribers:
                         self._by_uri.pop(uri, None)
 
-
     async def subscribers(self, uri: str) -> Iterable[Any]:
         async with self._lock:
             subscribers = self._by_uri.get(uri)
             if not subscribers:
                 return []
             return list(subscribers)
-
 
     async def snapshot(self) -> tuple[dict[str, list[Any]], dict[Any, set[str]]]:
         """Return shallow copies for debugging/testing."""

@@ -28,7 +28,7 @@ server.allow_tools(["add"])  # shout stays registered but hidden
 
 - Spec receipts: `docs/mcp/spec/schema-reference/tools-list.md`, `tools-call.md`
 - Input schema inference leans on `pydantic.TypeAdapter`; unsupported annotations fall back to permissive schemas.
-- Return annotations automatically generate `outputSchema` metadata (non-object outputs are wrapped as `{ "result": ... }`) and the runtime normaliser produces matching `structuredContent` so clients can consume structured results directly.
+- Return annotations automatically generate `outputSchema` metadata (non-object outputs are wrapped as `{ "result": ... }`) and the runtime normalizer produces matching `structuredContent` so clients can consume structured results directly.
 - For list change notifications, toggle `NotificationFlags.tools_changed` and emit updates when your registry mutates.
 - Use `get_context()` from `docs/openmcp/context.md` to emit logs or progress
   telemetry directly from tool handlers without importing SDK internals.

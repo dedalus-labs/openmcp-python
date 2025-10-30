@@ -1,17 +1,29 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
+from __future__ import annotations
+
 import copy
-
-import pytest
-
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+import pytest
+
+from openmcp.tool import extract_tool_spec, tool
 from openmcp.utils.schema import (
     DEDALUS_BOX_KEY,
     DEFAULT_WRAP_FIELD,
     SchemaEnvelope,
     SchemaError,
     compress_schema,
+    enforce_strict_schema,
     ensure_object_schema,
     generate_schema_from_annotation,
+    resolve_input_schema,
+    resolve_output_schema,
     unwrap_structured_content,
 )
 
@@ -40,11 +52,7 @@ class TestSchemaEnvelope:
 
     def test_unwrap_missing_box_field_raises(self) -> None:
         envelope = SchemaEnvelope(
-            schema={
-                "type": "object",
-                "properties": {"value": {"type": "integer"}},
-                "required": ["value"],
-            },
+            schema={"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"]},
             wrap_field="value",
         )
 
@@ -123,10 +131,7 @@ class TestCompressSchema:
         original = {
             "type": "object",
             "title": "Example",
-            "properties": {
-                "ctx": {"type": "string"},
-                "name": {"type": "string", "title": "Name"},
-            },
+            "properties": {"ctx": {"type": "string"}, "name": {"type": "string", "title": "Name"}},
             "required": ["ctx", "name"],
             "additionalProperties": False,
         }
@@ -141,3 +146,96 @@ class TestCompressSchema:
         assert compressed["properties"] == {"name": {"type": "string"}}
         assert compressed["required"] == ["name"]
         assert "additionalProperties" not in compressed
+
+
+class TestSchemaResolution:
+    def test_resolve_input_schema_from_dataclass(self) -> None:
+        @dataclass
+        class Args:
+            path: str
+            count: int
+
+        resolved = resolve_input_schema(Args)
+        assert resolved["type"] == "object"
+        assert set(resolved["properties"]) == {"path", "count"}
+
+    def test_resolve_output_schema_from_model(self) -> None:
+        class Payload(BaseModel):
+            ok: bool
+
+        envelope = resolve_output_schema(Payload)
+        assert not envelope.is_wrapped
+        assert envelope.schema["type"] == "object"
+        assert set(envelope.schema["properties"]) == {"ok"}
+
+    def test_resolve_output_schema_preserves_boxing(self) -> None:
+        original = generate_schema_from_annotation(str)
+        assert original.is_wrapped
+
+        resolved = resolve_output_schema(original)
+
+        assert resolved.is_wrapped
+        assert resolved.wrap_field == original.wrap_field
+        assert resolved.schema["properties"] == original.schema["properties"]
+        assert resolved.schema["required"] == original.schema["required"]
+        assert resolved.schema.get(DEDALUS_BOX_KEY) == original.schema.get(DEDALUS_BOX_KEY)
+        assert resolved.schema["type"] == "object"
+
+    def test_resolve_input_schema_rejects_scalar(self) -> None:
+        with pytest.raises(SchemaError):
+            resolve_input_schema(int)
+
+
+class TestEnforceStrictSchema:
+    def test_enforce_strict_sets_required_and_ap(self) -> None:
+        schema = {"type": "object", "properties": {"a": {"type": "string"}, "b": {"type": "integer", "default": None}}}
+
+        strict = enforce_strict_schema(schema)
+        assert strict["additionalProperties"] is False
+        assert strict["required"] == ["a", "b"]
+        assert "default" not in strict["properties"]["b"]
+
+    def test_enforce_strict_rejects_permissive_additional_properties(self) -> None:
+        schema = {"type": "object", "additionalProperties": True}
+        with pytest.raises(SchemaError):
+            enforce_strict_schema(schema)
+
+    def test_enforce_strict_inlines_single_ref(self) -> None:
+        schema = {
+            "$ref": "#/$defs/X",
+            "description": "example",
+            "$defs": {"X": {"type": "object", "properties": {"field": {"type": "string"}}}},
+            "definitions": {"Y": {"type": "object", "properties": {"other": {"type": "integer"}}}},
+        }
+
+        strict = enforce_strict_schema(schema)
+        assert strict["type"] == "object"
+        assert strict["additionalProperties"] is False
+        assert "field" in strict["properties"]
+        assert "$ref" not in strict
+
+
+class TestToolDecoratorIntegration:
+    def test_tool_accepts_class_schemas(self) -> None:
+        @dataclass
+        class InputArgs:
+            query: str
+
+        class OutputModel(BaseModel):
+            status: str
+
+        @tool(input_schema=InputArgs, output_schema=OutputModel)
+        def sample_tool(query: InputArgs) -> OutputModel:  # type: ignore[override]
+            return OutputModel(status=query.query)
+
+        spec = extract_tool_spec(sample_tool)
+        assert spec is not None
+        assert spec.input_schema and spec.input_schema["type"] == "object"
+        assert spec.output_schema and spec.output_schema["type"] == "object"
+
+    def test_tool_rejects_scalar_input_schema(self) -> None:
+        with pytest.raises(SchemaError):
+
+            @tool(input_schema=int)
+            def invalid_tool(value: int) -> None:  # type: ignore[empty-body]
+                pass

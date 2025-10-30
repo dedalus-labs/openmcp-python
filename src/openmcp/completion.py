@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 # Copyright (c) Dedalus Labs, Inc. and affiliates.
 
 """Completion registration utilities.
@@ -13,6 +19,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
+
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
@@ -32,13 +39,14 @@ class CompletionFunction(Protocol):
     """
 
     def __call__(
-        self,
-        argument: types.CompletionArgument,
-        context: types.CompletionContext | None,
-    ) -> types.Completion | "CompletionResult" | Iterable[str] | None | Awaitable[
-        types.Completion | "CompletionResult" | Iterable[str] | None
-    ]:
-        ...
+        self, argument: types.CompletionArgument, context: types.CompletionContext | None
+    ) -> (
+        types.Completion
+        | CompletionResult
+        | Iterable[str]
+        | None
+        | Awaitable[types.Completion | CompletionResult | Iterable[str] | None]
+    ): ...
 
 
 @dataclass(slots=True)
@@ -63,22 +71,19 @@ class CompletionSpec:
     """
 
     ref_type: str  # ``"prompt"`` or ``"resource"``
-    key: str       # prompt name or resource template URI
+    key: str  # prompt name or resource template URI
     fn: CompletionFunction
 
 
 _COMPLETION_ATTR = "__openmcp_completion__"
-_ACTIVE_SERVER: ContextVar["MCPServer | None"] = ContextVar(
-    "_openmcp_completion_server",
-    default=None,
-)
+_ACTIVE_SERVER: ContextVar[MCPServer | None] = ContextVar("_openmcp_completion_server", default=None)
 
 
-def get_active_server() -> "MCPServer | None":
+def get_active_server() -> MCPServer | None:
     return _ACTIVE_SERVER.get()
 
 
-def set_active_server(server: "MCPServer") -> object:
+def set_active_server(server: MCPServer) -> object:
     return _ACTIVE_SERVER.set(server)
 
 
@@ -87,9 +92,7 @@ def reset_active_server(token: object) -> None:
 
 
 def completion(
-    *,
-    prompt: str | None = None,
-    resource: str | None = None,
+    *, prompt: str | None = None, resource: str | None = None
 ) -> Callable[[CompletionFunction], CompletionFunction]:
     """Register a completion provider.
 

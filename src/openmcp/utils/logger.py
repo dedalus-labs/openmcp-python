@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Logging utilities for OpenMCP.
 
 This mirrors the richer logger used in ``api-final`` while keeping the surface
@@ -20,6 +26,7 @@ import orjson as oj
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install as rich_install
+
 
 DEFAULT_LOGGER_NAME: Final[str] = "openmcp"
 ENV_LOG_LEVEL: Final[str] = "OPENMCP_LOG_LEVEL"
@@ -136,7 +143,6 @@ def _json_handler(level: int) -> logging.Handler:
 
 def configure_logging(*, force: bool = False) -> None:
     """Configure root logging with Rich + JSON handlers as needed."""
-
     global _LOGGER_CONFIGURED
     root = logging.getLogger()
 

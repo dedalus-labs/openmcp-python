@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Sampling capability adapter for MCP servers.
 
 Spec receipts:
@@ -13,11 +19,11 @@ from dataclasses import dataclass
 from typing import Any
 
 import anyio
+from mcp.server.lowlevel.server import request_ctx
+from mcp.shared.exceptions import McpError
 
 from ... import types
 from ...utils import get_logger
-from mcp.server.lowlevel.server import request_ctx
-from mcp.shared.exceptions import McpError
 
 
 DEFAULT_TIMEOUT = 60.0
@@ -48,8 +54,7 @@ class SamplingService:
         if not session.check_client_capability(types.ClientCapabilities(sampling=types.SamplingCapability())):
             raise McpError(
                 types.ErrorData(
-                    code=types.METHOD_NOT_FOUND,
-                    message="Client does not advertise the sampling capability",
+                    code=types.METHOD_NOT_FOUND, message="Client does not advertise the sampling capability"
                 )
             )
 
@@ -58,7 +63,9 @@ class SamplingService:
             await self._enforce_cooldown(state)
             metadata = (params.metadata or {}).copy()  # type: ignore[attr-defined]
             if "requestId" not in metadata:
-                metadata["requestId"] = f"sampling-{id(self)}-{state.semaphore._value}"  # pragma: no cover - best effort
+                metadata["requestId"] = (
+                    f"sampling-{id(self)}-{state.semaphore._value}"  # pragma: no cover - best effort
+                )
             params.metadata = metadata  # type: ignore[attr-defined]
 
             try:
@@ -69,10 +76,7 @@ class SamplingService:
                 state.consecutive_failures += 1
                 state.cooldown_until = anyio.current_time() + COOLDOWN_SECONDS
                 raise McpError(
-                    types.ErrorData(
-                        code=types.INTERNAL_ERROR,
-                        message="sampling request timed out",
-                    )
+                    types.ErrorData(code=types.INTERNAL_ERROR, message="sampling request timed out")
                 ) from None
             except McpError as exc:
                 state.consecutive_failures += 1
@@ -88,8 +92,7 @@ class SamplingService:
         if remaining > 0:
             raise McpError(
                 types.ErrorData(
-                    code=types.SERVICE_UNAVAILABLE,
-                    message="sampling temporarily unavailable; please retry later",
+                    code=types.SERVICE_UNAVAILABLE, message="sampling temporarily unavailable; please retry later"
                 )
             )
         state.consecutive_failures = 0

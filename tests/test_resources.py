@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Resource capability tests following the MCP spec receipts.
 
 See ``docs/mcp/spec/schema-reference/resources-read.md`` for the binary encoding
@@ -11,11 +17,10 @@ import gc
 import weakref
 
 import anyio
+from mcp.shared.exceptions import McpError
 import pytest
 
 from openmcp import MCPServer, NotificationFlags, resource, types
-from mcp.shared.exceptions import McpError
-
 from tests.helpers import DummySession, FailingSession, run_with_context
 
 
@@ -24,6 +29,7 @@ async def test_resource_registration_and_read():
     server = MCPServer("resources-demo")
 
     with server.binding():
+
         @resource("resource://demo/greeting", name="greeting", description="Simple greeting")
         def greeting() -> str:
             return "hello world"
@@ -46,6 +52,7 @@ async def test_resource_service_read_returns_result_instance():
     server = MCPServer("resources-read-result")
 
     with server.binding():
+
         @resource("resource://demo/direct")
         def direct() -> str:
             return "direct-value"
@@ -60,8 +67,9 @@ async def test_resource_service_error_returns_result_wrapper():
     server = MCPServer("resources-read-error")
 
     with server.binding():
+
         @resource("resource://demo/error")
-        def boom() -> str:  # pragma: no cover - executed via service
+        def boom() -> str:
             raise RuntimeError("boom")
 
     result = await server.resources.read("resource://demo/error")
@@ -121,6 +129,7 @@ async def test_resource_binary_content_encoding():
     server = MCPServer("resources-binary")
 
     with server.binding():
+
         @resource("resource://demo/binary", mime_type="application/octet-stream")
         def binary() -> bytes:
             return payload
@@ -135,7 +144,6 @@ async def test_resource_binary_content_encoding():
 
 def test_resource_subscribe_capability_flag():
     """`resources.subscribe` is advertised by default and remains enabled after overrides."""
-
     server = MCPServer("resources-capability")
     init_opts = server.create_initialization_options()
     assert init_opts.capabilities.resources
@@ -155,10 +163,7 @@ def test_resource_subscribe_capability_flag():
 
 
 def test_resources_list_changed_capability_flag():
-    server = MCPServer(
-        "resources-list-flag",
-        notification_flags=NotificationFlags(resources_changed=True),
-    )
+    server = MCPServer("resources-list-flag", notification_flags=NotificationFlags(resources_changed=True))
 
     init_opts = server.create_initialization_options()
     assert init_opts.capabilities.resources
@@ -334,6 +339,7 @@ async def test_resources_list_cursor_past_end():
     server = MCPServer("resources-past-end")
 
     for idx in range(2):
+
         def make_resource(i: int):
             @resource(f"resource://demo/{i}")
             def _res() -> str:

@@ -1,17 +1,20 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Logging capability tests for logging/setLevel."""
 
 from __future__ import annotations
 
 import logging
 
+import anyio
+from mcp.shared.exceptions import McpError
 import pytest
 
-from mcp.shared.exceptions import McpError
-
 from openmcp import MCPServer, types
-
-import anyio
-
 from tests.helpers import DummySession, run_with_context
 
 

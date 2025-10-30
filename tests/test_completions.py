@@ -1,6 +1,12 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Tests for completion capability.
 
-These cases track the behaviour defined in
+These cases track the behavior defined in
 ``docs/mcp/spec/schema-reference/completion-complete.md`` and the narrative in
 ``docs/mcp/capabilities/completion/protocol-messages.md``.
 """
@@ -16,7 +22,6 @@ from openmcp.completion import CompletionResult
 @pytest.mark.anyio
 async def test_prompt_completion_registration() -> None:
     """Prompt completions should respond with registered values (spec receipts)."""
-
     server = MCPServer("comp")
 
     with server.binding():
@@ -38,7 +43,6 @@ async def test_prompt_completion_registration() -> None:
 @pytest.mark.anyio
 async def test_resource_completion_limit_enforced() -> None:
     """Servers must not return more than 100 values (completion spec)."""
-
     server = MCPServer("comp-limit")
 
     long_list = [f"item-{i}" for i in range(150)]
@@ -63,7 +67,6 @@ async def test_resource_completion_limit_enforced() -> None:
 @pytest.mark.anyio
 async def test_missing_completion_returns_empty() -> None:
     """Unknown completions resolve to empty arrays as per spec tolerance."""
-
     server = MCPServer("comp-missing")
     ref = types.PromptReference(type="ref/prompt", name="unknown")
     argument = types.CompletionArgument(name="language", value="py")

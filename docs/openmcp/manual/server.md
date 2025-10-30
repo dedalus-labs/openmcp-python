@@ -1,7 +1,7 @@
 # Server Guide
 
 This chapter documents `openmcp.server.MCPServer`, its capability services, and all runtime knobs that
-influence wire behaviour.
+influence wire behavior.
 
 ## Constructing `MCPServer`
 
@@ -22,7 +22,7 @@ server = MCPServer(
     ),
     http_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
-        allowed_hosts=["127.0.0.1:3000"],
+        allowed_hosts=["127.0.0.1:8000"],
     ),
     authorization=AuthorizationConfig(
         enabled=True,
@@ -49,6 +49,7 @@ server = MCPServer(
 | `notification_sink`  | `NotificationSink | None`                | `DefaultNotificationSink()` | Handles outbound notifications. |
 | `http_security`      | `TransportSecuritySettings | None`       | DNS rebinding protection on | Applies only to streamable HTTP transport. |
 | `authorization`      | `AuthorizationConfig | None`             | disabled | When enabled, serves PRM and enforces bearer tokens. |
+| `streamable_http_stateless` | `bool` | `False` | When `True`, each Streamable HTTP request is handled independently with no session tracking—useful for FaaS deployments. |
 
 ### Notification Flags
 

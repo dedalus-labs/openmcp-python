@@ -1,8 +1,14 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
 import base64
-import json
 from dataclasses import dataclass
+import json
 
 from openmcp import types
 from openmcp.server.adapters import normalize_resource_payload, normalize_tool_result

@@ -1,13 +1,19 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Utilities for tracking observers and broadcasting notifications."""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, Protocol
 import weakref
-from typing import Any, Protocol, TYPE_CHECKING
 
 import anyio
-
 from mcp.server.lowlevel.server import request_ctx
+
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .. import types
@@ -16,22 +22,13 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 class NotificationSink(Protocol):
     """Abstract destination for server-initiated notifications."""
 
-    async def send_notification(
-        self,
-        session: Any,
-        notification: "types.ServerNotification",
-    ) -> None:
-        ...
+    async def send_notification(self, session: Any, notification: types.ServerNotification) -> None: ...
 
 
 class DefaultNotificationSink:
     """Fallback sink that sends notifications directly via the session object."""
 
-    async def send_notification(
-        self,
-        session: Any,
-        notification: "types.ServerNotification",
-    ) -> None:
+    async def send_notification(self, session: Any, notification: types.ServerNotification) -> None:
         await session.send_notification(notification)
 
 
@@ -58,11 +55,7 @@ class ObserverRegistry:
             try:
                 await self._sink.send_notification(session, notification)
             except Exception as exc:  # pragma: no cover - defensive
-                logger.warning(
-                    "Failed to notify observer %s: %s",
-                    getattr(session, "name", repr(session)),
-                    exc,
-                )
+                logger.warning("Failed to notify observer %s: %s", getattr(session, "name", repr(session)), exc)
                 stale.append(session)
                 await anyio.lowlevel.checkpoint()
 

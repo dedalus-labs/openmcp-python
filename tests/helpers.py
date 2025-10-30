@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Shared test helpers for MCP server tests."""
 
 from __future__ import annotations
@@ -5,10 +11,10 @@ from __future__ import annotations
 from itertools import count
 
 import anyio
-
-from openmcp import types
 from mcp.server.lowlevel.server import request_ctx
 from mcp.shared.context import RequestContext
+
+from openmcp import types
 
 
 _REQUEST_COUNTER = count(1)
@@ -22,10 +28,8 @@ class DummySession:
         self.notifications: list[types.ServerNotification] = []
 
     async def send_notification(
-        self,
-        notification: types.ServerNotification,
-        related_request_id: types.RequestId | None = None,
-    ) -> None:  # pragma: no cover - exercised indirectly
+        self, notification: types.ServerNotification, related_request_id: types.RequestId | None = None
+    ) -> None:
         await anyio.lowlevel.checkpoint()
         self.notifications.append(notification)
 
@@ -38,10 +42,8 @@ class FailingSession(DummySession):
         self.failures = 0
 
     async def send_notification(
-        self,
-        notification: types.ServerNotification,
-        related_request_id: types.RequestId | None = None,
-    ) -> None:  # pragma: no cover - exercised indirectly
+        self, notification: types.ServerNotification, related_request_id: types.RequestId | None = None
+    ) -> None:
         self.failures += 1
         raise RuntimeError("notification failure")
 
@@ -59,13 +61,7 @@ class RecordingSession(DummySession):
         self.log_messages.append((level, dict(data), logger))
 
     async def send_progress_notification(
-        self,
-        progress_token,
-        progress,
-        *,
-        total=None,
-        message=None,
-        related_request_id=None,
+        self, progress_token, progress, *, total=None, message=None, related_request_id=None
     ):
         await anyio.lowlevel.checkpoint()
         self.progress_events.append(
@@ -90,5 +86,5 @@ async def run_with_context(session: DummySession, func, *args, meta=None):
     token = request_ctx.set(ctx)
     try:
         return await func(*args)
-    finally:  # pragma: no cover - exercised indirectly
+    finally:
         request_ctx.reset(token)

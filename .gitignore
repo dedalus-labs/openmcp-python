@@ -51,9 +51,6 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Internal materials for core maintainers
-internal/
-
 # Translations
 *.mo
 *.pot
@@ -138,7 +135,7 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# Internals
+# Internal materials for core maintainers
 internals/
 
 # mkdocs documentation

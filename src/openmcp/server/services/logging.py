@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Logging capability service.
 
 Implements the ``logging/setLevel`` request and bridges Python's logging system
@@ -11,17 +17,18 @@ to MCP ``notifications/message`` events, as described in the spec receipts:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 import logging
+from typing import Any
 import weakref
-from typing import Any, Iterable
 
 import anyio
-
-from ... import types
-from mcp.shared.exceptions import McpError
 from mcp.server.lowlevel.server import request_ctx
+from mcp.shared.exceptions import McpError
 
 from ..notifications import NotificationSink
+from ... import types
+
 
 _LOGGING_LEVEL_MAP = {
     "debug": logging.DEBUG,
@@ -57,12 +64,7 @@ class LoggingService:
         async with self._lock:
             self._session_levels[context.session] = numeric
 
-    async def emit(
-        self,
-        level: types.LoggingLevel,
-        data: Any,
-        logger_name: str | None = None,
-    ) -> None:
+    async def emit(self, level: types.LoggingLevel, data: Any, logger_name: str | None = None) -> None:
         numeric = self._resolve(level)
         await self._broadcast(level, numeric, data, logger_name)
 
@@ -79,10 +81,7 @@ class LoggingService:
             return _LOGGING_LEVEL_MAP[level]
         except KeyError as exc:  # pragma: no cover - defensive
             raise McpError(
-                types.ErrorData(
-                    code=types.INVALID_PARAMS,
-                    message=f"Unsupported logging level '{level}'",
-                )
+                types.ErrorData(code=types.INVALID_PARAMS, message=f"Unsupported logging level '{level}'")
             ) from exc
 
     def _coerce_level_name(self, numeric: int) -> types.LoggingLevel:
@@ -110,11 +109,7 @@ class LoggingService:
         root.addHandler(self._handler)
 
     async def _broadcast(
-        self,
-        level: types.LoggingLevel,
-        numeric_level: int,
-        data: Any,
-        logger_name: str | None,
+        self, level: types.LoggingLevel, numeric_level: int, data: Any, logger_name: str | None
     ) -> None:
         async with self._lock:
             targets = list(self._session_levels.items())
@@ -122,14 +117,8 @@ class LoggingService:
         if not targets:
             return
 
-        params = types.LoggingMessageNotificationParams(
-            level=level,
-            logger=logger_name,
-            data=data,
-        )
-        notification = types.ServerNotification(
-            types.LoggingMessageNotification(params=params)
-        )
+        params = types.LoggingMessageNotificationParams(level=level, logger=logger_name, data=data)
+        notification = types.ServerNotification(types.LoggingMessageNotification(params=params))
 
         stale: list[Any] = []
         for session, threshold in targets:

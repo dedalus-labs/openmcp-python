@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Client cancellation demo.
 
 Requires `examples/full_demo/server.py` to be running.
@@ -6,18 +12,15 @@ Requires `examples/full_demo/server.py` to be running.
 from __future__ import annotations
 
 import anyio
-
-from openmcp import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
-from openmcp import types
+
+from openmcp import MCPClient, types
 
 
 async def main() -> None:
-    async with streamablehttp_client("http://127.0.0.1:3000/mcp") as (reader, writer, _):
+    async with streamablehttp_client("http://127.0.0.1:8000/mcp") as (reader, writer, _):
         async with MCPClient(reader, writer) as client:
-            request = types.ClientRequest(
-                types.CallToolRequest(name="sleep", arguments={"seconds": 10})
-            )
+            request = types.ClientRequest(types.CallToolRequest(name="sleep", arguments={"seconds": 10}))
 
             async def invoke():
                 return await client.send_request(request, types.CallToolResult)

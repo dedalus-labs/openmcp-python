@@ -10,7 +10,7 @@ from openmcp import MCPClient
 from openmcp.client import transports
 from openmcp import types
 
-async with transports.streamable_http_client("https://localhost:3000/mcp") as (reader, writer, get_session_id):
+async with transports.streamable_http_client("https://localhost:8000/mcp") as (reader, writer, get_session_id):
     async with MCPClient(
         reader,
         writer,
@@ -71,7 +71,7 @@ if scope.cancel_called:
 
 ### Transport Helpers
 
-| Helper                              | Behaviour |
+| Helper                              | behavior |
 | ----------------------------------- | --------- |
 | `transports.stdio_client(cmd)`      | Spawns a child process and connects via STDIO. |
 | `transports.streamable_http_client(url)` | Opens a persistent HTTP connection (POST + SSE GET). |

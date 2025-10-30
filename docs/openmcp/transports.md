@@ -12,8 +12,25 @@ via the constructor or at call time:
 ```python
 server = MCPServer("demo")              # defaults to streamable HTTP
 
-await server.serve()                     # -> Streamable HTTP on 127.0.0.1:3000
+await server.serve()                     # -> Streamable HTTP on 127.0.0.1:8000
 await server.serve(transport="stdio")   # -> STDIO
+
+# Stateless Streamable HTTP
+
+By default the Streamable HTTP transport is *stateful*: the server assigns an
+`Mcp-Session-Id` during `initialize` and expects every subsequent POST/GET to
+echo that header. This matches most long-lived deployments. If you are hosting
+in a stateless environment (e.g. AWS Lambda) and cannot persist sessions
+between invocations, pass `streamable_http_stateless=True` to the server:
+
+```python
+server = MCPServer("lambda", streamable_http_stateless=True)
+```
+
+In stateless mode each request gets its own temporary transport; a client may
+open the SSE stream with a GET before it has sent `initialize`, which mirrors
+the optional flow described in the MCP spec. Stateful mode remains the default
+because it enables resumability and aligns with the reference SDK’s behaviour.
 ```
 
 ## HTTP security defaults

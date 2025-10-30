@@ -1,11 +1,18 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Completion capability service."""
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
-from ...completion import CompletionResult, CompletionSpec, extract_completion_spec
 from ... import types
+from ...completion import CompletionResult, CompletionSpec, extract_completion_spec
 from ...utils import maybe_await_with_args
 
 
@@ -38,22 +45,13 @@ class CompletionService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_spec(
-        self,
-        ref: types.PromptReference | types.ResourceTemplateReference,
-    ) -> CompletionSpec | None:
+    def _get_spec(self, ref: types.PromptReference | types.ResourceTemplateReference) -> CompletionSpec | None:
         if isinstance(ref, types.PromptReference):
             return self._completion_specs.get(("prompt", ref.name))
         return self._completion_specs.get(("resource", ref.uri))
 
     def _coerce_completion(
-        self,
-        result: types.Completion
-        | CompletionResult
-        | Iterable[Any]
-        | Mapping[str, Any]
-        | str
-        | None,
+        self, result: types.Completion | CompletionResult | Iterable[Any] | Mapping[str, Any] | str | None
     ) -> types.Completion | None:
         if result is None:
             return None
@@ -74,12 +72,7 @@ class CompletionService:
             return self._from_values(result, None, None)
         raise TypeError(f"Unsupported completion return type: {type(result)!r}")
 
-    def _from_values(
-        self,
-        values: Iterable[Any],
-        total: int | None,
-        has_more: bool | None,
-    ) -> types.Completion:
+    def _from_values(self, values: Iterable[Any], total: int | None, has_more: bool | None) -> types.Completion:
         coerced = [str(value) for value in values]
         limited, limited_has_more = self._limit_values(coerced, has_more)
         return types.Completion(values=limited, total=total, hasMore=limited_has_more)
@@ -88,11 +81,7 @@ class CompletionService:
         limited, has_more = self._limit_values(list(completion.values), completion.hasMore)
         return types.Completion(values=limited, total=completion.total, hasMore=has_more)
 
-    def _limit_values(
-        self,
-        values: list[str],
-        has_more: bool | None,
-    ) -> tuple[list[str], bool | None]:
+    def _limit_values(self, values: list[str], has_more: bool | None) -> tuple[list[str], bool | None]:
         limit = 100
         if len(values) <= limit:
             return values, has_more

@@ -100,12 +100,12 @@ Run the example and call the metadata endpoint:
 
 ```bash
 uv run python examples/auth_stub/server.py
-curl -H "Authorization: Bearer demo-token" http://127.0.0.1:3000/mcp
+curl -H "Authorization: Bearer demo-token" http://127.0.0.1:8000/mcp
 ```
 
 ## 5. Cancellation
 
-`examples/cancellation.py` shows cancelling long-running tool calls from the client. The script starts a
+`examples/cancellation.py` shows canceling long-running tool calls from the client. The script starts a
 server locally, issues a tool call, and cancels after two seconds.
 
 ## Running Examples

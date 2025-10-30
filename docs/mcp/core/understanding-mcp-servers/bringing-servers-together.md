@@ -21,7 +21,7 @@ Consider a personalized AI travel planner application, with three connected serv
        "destination": "Barcelona",
        "departure_date": "2024-06-15",
        "return_date": "2024-06-22",
-       "budget": 3000,
+       "budget": 8000,
        "travelers": 2
      }
    }

@@ -1,8 +1,16 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
+from __future__ import annotations
+
 import importlib
 
 import pytest
 
-from openmcp import versioning, types
+from openmcp import types, versioning
 from openmcp._sdk_loader import ensure_sdk_importable
 
 
@@ -22,7 +30,7 @@ async def test_supported_protocol_versions_patched() -> None:
     shared_version = importlib.import_module("mcp.shared.version")
 
     assert shared_version.SUPPORTED_PROTOCOL_VERSIONS == versioning.SUPPORTED_PROTOCOL_VERSIONS
-    assert shared_version.SUPPORTED_PROTOCOL_VERSIONS == [shared_version.SUPPORTED_PROTOCOL_VERSIONS[-1]]
+    assert [shared_version.SUPPORTED_PROTOCOL_VERSIONS[-1]] == shared_version.SUPPORTED_PROTOCOL_VERSIONS
 
 
 @pytest.mark.anyio

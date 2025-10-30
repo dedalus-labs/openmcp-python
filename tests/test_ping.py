@@ -1,11 +1,16 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Ping service tests (docs/mcp/spec/schema-reference/ping.md)."""
 
 from __future__ import annotations
 
 import anyio
-import pytest
-
 from mcp.client.session import ClientSession
+import pytest
 
 from openmcp import MCPServer, types
 from openmcp.server.services.ping import PingService
@@ -149,7 +154,6 @@ async def test_ping_service_callbacks() -> None:
 @pytest.mark.anyio
 async def test_ping_roundtrip_and_server_initiated_ping() -> None:
     """Clients can ping the server and vice versa using the new helpers."""
-
     server = MCPServer("ping")
     init_options = server.create_initialization_options()
 

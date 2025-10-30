@@ -1,13 +1,20 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
+from mcp.shared.exceptions import McpError
 import pytest
 
 from openmcp import NotificationFlags, types
-from mcp.shared.exceptions import McpError
 from openmcp.server import MCPServer
 from openmcp.tool import tool
-
 from tests.helpers import DummySession, run_with_context
 
 

@@ -1,6 +1,12 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """High-level MCP client wrapper built on the reference SDK.
 
-The implementation mirrors the behaviour described in:
+The implementation mirrors the behavior described in:
 
 * ``docs/mcp/core/understanding-mcp-clients/core-client-features.md``
 * ``docs/mcp/core/cancellation/index.md``
@@ -19,20 +25,27 @@ from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
-import anyio
 from anyio import Lock
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
 from .._sdk_loader import ensure_sdk_importable
 from ..utils.coro import maybe_await_with_args
 
+
 ensure_sdk_importable()
 
 from mcp import types
 from mcp.client.session import ClientSession
 
-SamplingHandler = Callable[[Any, types.CreateMessageRequestParams], Awaitable[types.CreateMessageResult | types.ErrorData] | types.CreateMessageResult | types.ErrorData]
-ElicitationHandler = Callable[[Any, types.ElicitRequestParams], Awaitable[types.ElicitResult | types.ErrorData] | types.ElicitResult | types.ErrorData]
+
+SamplingHandler = Callable[
+    [Any, types.CreateMessageRequestParams],
+    Awaitable[types.CreateMessageResult | types.ErrorData] | types.CreateMessageResult | types.ErrorData,
+]
+ElicitationHandler = Callable[
+    [Any, types.ElicitRequestParams],
+    Awaitable[types.ElicitResult | types.ErrorData] | types.ElicitResult | types.ErrorData,
+]
 LoggingHandler = Callable[[types.LoggingMessageNotificationParams], Awaitable[None] | None]
 
 T_RequestResult = TypeVar("T_RequestResult")
@@ -77,7 +90,7 @@ class MCPClient:
         initial_roots = list(self._config.initial_roots or []) if self._supports_roots else []
         self._root_lock = Lock()
         self._roots_version = 0
-        self._roots: list[types.Root] = [self._normalise_root(root) for root in initial_roots]
+        self._roots: list[types.Root] = [self._normalize_root(root) for root in initial_roots]
 
         self._session: ClientSession | None = None
         self.initialize_result: types.InitializeResult | None = None
@@ -86,7 +99,7 @@ class MCPClient:
     # Async context manager
     # ---------------------------------------------------------------------
 
-    async def __aenter__(self) -> "MCPClient":
+    async def __aenter__(self) -> MCPClient:
         session = ClientSession(
             self._read_stream,
             self._write_stream,
@@ -136,11 +149,7 @@ class MCPClient:
         progress_callback: Callable[[float, float | None, str | None], Awaitable[None] | None] | None = None,
     ) -> T_RequestResult:
         """Forward a request to the server and await the result."""
-        return await self.session.send_request(
-            request,
-            result_type,
-            progress_callback=progress_callback,
-        )
+        return await self.session.send_request(request, result_type, progress_callback=progress_callback)
 
     async def cancel_request(self, request_id: types.RequestId, *, reason: str | None = None) -> None:
         """Emit ``notifications/cancelled`` per ``docs/mcp/core/cancellation/index.md``."""
@@ -151,17 +160,17 @@ class MCPClient:
     async def update_roots(self, roots: Iterable[types.Root | dict[str, Any]], *, notify: bool = True) -> None:
         """Replace the advertised roots and optionally send ``roots/list_changed``.
 
-        This fulfils the behaviour described in
+        This fulfils the behavior described in
         ``docs/mcp/core/understanding-mcp-clients/core-client-features.md``.
 
         """
         if not self._supports_roots:
             raise RuntimeError("Roots capability is not enabled for this client")
 
-        normalised = [self._normalise_root(root) for root in roots]
+        normalized = [self._normalize_root(root) for root in roots]
         async with self._root_lock:
             self._roots_version += 1
-            self._roots = normalised
+            self._roots = normalized
 
         if notify and self._session is not None:
             await self._session.send_roots_list_changed()
@@ -220,7 +229,7 @@ class MCPClient:
         return list_roots_handler
 
     @staticmethod
-    def _normalise_root(value: types.Root | dict[str, Any]) -> types.Root:
+    def _normalize_root(value: types.Root | dict[str, Any]) -> types.Root:
         if isinstance(value, types.Root):
             return value
         return types.Root.model_validate(value)

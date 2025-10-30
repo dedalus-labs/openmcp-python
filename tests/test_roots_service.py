@@ -1,24 +1,29 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
 
+from collections.abc import Mapping
 import gc
-import weakref
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
+import weakref
 
 import anyio
+from mcp.shared.exceptions import McpError
 import pytest
 
 from openmcp import types
 from openmcp.server import MCPServer
 from openmcp.server.services.roots import RootGuard, RootsService
-from mcp.shared.exceptions import McpError
 from tests.helpers import run_with_context
 
 
 class SessionStub:
     """Weak-reference friendly session stand-in."""
-
-    pass
 
 
 class FakeRootsRPC:
@@ -38,9 +43,7 @@ class FakeRootsRPC:
 @pytest.mark.anyio
 async def test_refresh_and_guard_allows_within(tmp_path: Path) -> None:
     root_uri = tmp_path.as_uri()
-    rpc = FakeRootsRPC([
-        {"roots": [types.Root(uri=root_uri).model_dump(by_alias=True)]},
-    ])
+    rpc = FakeRootsRPC([{"roots": [types.Root(uri=root_uri).model_dump(by_alias=True)]}])
     service = RootsService(rpc, debounce_delay=0.0)
     session = SessionStub()
 
@@ -55,9 +58,7 @@ async def test_refresh_and_guard_allows_within(tmp_path: Path) -> None:
     assert guard.within(f"file://{tmp_path}/inside.txt")
     assert not guard.within(tmp_path.parent / "outside.txt")
 
-    rpc._pages = [
-        {"roots": [types.Root(uri=root_uri).model_dump(by_alias=True)]},
-    ]
+    rpc._pages = [{"roots": [types.Root(uri=root_uri).model_dump(by_alias=True)]}]
     await service.on_list_changed(session)
     await anyio.sleep(0)
     snapshot = service.snapshot(session)
@@ -67,9 +68,7 @@ async def test_refresh_and_guard_allows_within(tmp_path: Path) -> None:
 
 @pytest.mark.anyio
 async def test_remove_clears_cache(tmp_path: Path) -> None:
-    rpc = FakeRootsRPC([
-        {"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]},
-    ])
+    rpc = FakeRootsRPC([{"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]}])
     service = RootsService(rpc, debounce_delay=0.0)
     session = SessionStub()
 
@@ -90,10 +89,7 @@ async def test_pagination_and_versioning(tmp_path: Path) -> None:
 
     await service.on_session_open(session)
     snapshot = service.snapshot(session)
-    assert {str(root.uri) for root in snapshot} == {
-        (tmp_path / "a").as_uri(),
-        (tmp_path / "b").as_uri(),
-    }
+    assert {str(root.uri) for root in snapshot} == {(tmp_path / "a").as_uri(), (tmp_path / "b").as_uri()}
     assert service.version(session) == 1
 
     cursor = service.encode_cursor(session, offset=1)
@@ -102,9 +98,7 @@ async def test_pagination_and_versioning(tmp_path: Path) -> None:
     assert offset == 1
 
     # Trigger a change so the version increments.
-    rpc._pages = [
-        {"roots": [types.Root(uri=(tmp_path / "c").as_uri()).model_dump(by_alias=True)]},
-    ]
+    rpc._pages = [{"roots": [types.Root(uri=(tmp_path / "c").as_uri()).model_dump(by_alias=True)]}]
     await service.refresh(session)
     assert service.version(session) == 2
     with pytest.raises(McpError):
@@ -122,9 +116,7 @@ async def test_symlink_outside_denied(tmp_path: Path) -> None:
     except OSError as exc:  # pragma: no cover - platform without symlink support
         pytest.skip(f"symlinks unsupported: {exc}")
 
-    rpc = FakeRootsRPC([
-        {"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]},
-    ])
+    rpc = FakeRootsRPC([{"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]}])
     service = RootsService(rpc, debounce_delay=0.0)
     session = SessionStub()
     await service.on_session_open(session)
@@ -135,9 +127,7 @@ async def test_symlink_outside_denied(tmp_path: Path) -> None:
 
 @pytest.mark.anyio
 async def test_debounce_coalesces_requests(tmp_path: Path) -> None:
-    rpc = FakeRootsRPC([
-        {"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]},
-    ])
+    rpc = FakeRootsRPC([{"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]}])
     service = RootsService(rpc, debounce_delay=0.05)
     session = SessionStub()
 
@@ -153,9 +143,7 @@ async def test_debounce_coalesces_requests(tmp_path: Path) -> None:
 
 @pytest.mark.anyio
 async def test_weakref_cleanup_allows_gc(tmp_path: Path) -> None:
-    rpc = FakeRootsRPC([
-        {"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]},
-    ])
+    rpc = FakeRootsRPC([{"roots": [types.Root(uri=tmp_path.as_uri()).model_dump(by_alias=True)]}])
     service = RootsService(rpc, debounce_delay=0.0)
     session = SessionStub()
 

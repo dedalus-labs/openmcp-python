@@ -11,7 +11,7 @@ terminate.
 
 **OpenMCP**: `ensure_sdk_importable()` patches the reference SDK so
 `SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18"]`. Helpers in `openmcp.versioning` let you inspect the
-negotiated version and associated feature switches if you need to branch behaviour explicitly in the
+negotiated version and associated feature switches if you need to branch behavior explicitly in the
 future.
 
 ```python

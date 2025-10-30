@@ -1,3 +1,9 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 """Prompt registration utilities.
 
 Supports the ambient authoring model documented in
@@ -9,12 +15,13 @@ Supports the ambient authoring model documented in
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
-from collections.abc import Callable, Iterable, Mapping
-from typing import Any, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 from . import types
+
 
 if types:  # pragma: no cover - import guard for static analysis
     types.GetPromptResult  # noqa: B018
@@ -27,10 +34,8 @@ class PromptFunction(Protocol):
     """Callable signature for prompt renderers."""
 
     def __call__(
-        self,
-        arguments: Mapping[str, str] | None,
-    ) -> (types.GetPromptResult | Iterable[Any] | Mapping[str, Any] | None):
-        ...
+        self, arguments: Mapping[str, str] | None
+    ) -> types.GetPromptResult | Iterable[Any] | Mapping[str, Any] | None: ...
 
 
 PromptArgumentLike = Mapping[str, Any] | types.PromptArgument
@@ -51,17 +56,14 @@ class PromptSpec:
 
 
 _PROMPT_ATTR = "__openmcp_prompt__"
-_ACTIVE_SERVER: ContextVar["MCPServer | None"] = ContextVar(
-    "_openmcp_prompt_server",
-    default=None,
-)
+_ACTIVE_SERVER: ContextVar[MCPServer | None] = ContextVar("_openmcp_prompt_server", default=None)
 
 
-def get_active_server() -> "MCPServer | None":
+def get_active_server() -> MCPServer | None:
     return _ACTIVE_SERVER.get()
 
 
-def set_active_server(server: "MCPServer") -> object:
+def set_active_server(server: MCPServer) -> object:
     return _ACTIVE_SERVER.set(server)
 
 
@@ -128,10 +130,4 @@ def _coerce_icon(value: IconLike) -> types.Icon:
     return types.Icon(**value)
 
 
-__all__ = [
-    "prompt",
-    "PromptSpec",
-    "extract_prompt_spec",
-    "set_active_server",
-    "reset_active_server",
-]
+__all__ = ["prompt", "PromptSpec", "extract_prompt_spec", "set_active_server", "reset_active_server"]

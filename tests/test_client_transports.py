@@ -1,24 +1,31 @@
+# ==============================================================================
+#                  © 2025 Dedalus Labs, Inc. and affiliates
+#                            Licensed under MIT
+#               github.com/dedalus-labs/openmcp-python/LICENSE
+# ==============================================================================
+
 from __future__ import annotations
+
 
 """Targeted transport regression tests.
 
 These tests deliberately patch the reference SDK transport to surface the
-persistent GET/SSE stream behaviour that breaks on AWS Lambda.  ``lambda_http_client``
+persistent GET/SSE stream behavior that breaks on AWS Lambda.  ``lambda_http_client``
 must avoid triggering that code path, while the vanilla
 ``streamablehttp_client`` should continue to expose it so we can catch any
 accidental regression.
 """
 
 from contextlib import asynccontextmanager
-from typing import Any, Iterable
+from typing import Any
 
 import anyio
 import anyio.abc
 import pytest
 
+from openmcp._sdk_loader import ensure_sdk_importable
 from openmcp.client.transports import lambda_http_client
 
-from openmcp._sdk_loader import ensure_sdk_importable
 
 ensure_sdk_importable()
 
@@ -32,7 +39,9 @@ class SentinelError(RuntimeError):
 class FakeTransport:
     """Test double mirroring the SDK transport interface without real I/O."""
 
-    def __init__(self, url: str, headers: dict[str, str] | None, timeout: float, sse_read_timeout: float, auth: Any) -> None:
+    def __init__(
+        self, url: str, headers: dict[str, str] | None, timeout: float, sse_read_timeout: float, auth: Any
+    ) -> None:
         self.url = url
         self.request_headers = headers or {}
         self.timeout = timeout
@@ -69,10 +78,11 @@ class FakeTransport:
 @pytest.mark.anyio
 async def test_lambda_http_client_injects_noop_get_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     """Our wrapper must *not* invoke the GET/SSE starter the SDK normally uses."""
-
     transport_instances: list[FakeTransport] = []
 
-    def transport_factory(url: str, headers: dict[str, str] | None, timeout: float, sse_timeout: float, auth: Any) -> FakeTransport:
+    def transport_factory(
+        url: str, headers: dict[str, str] | None, timeout: float, sse_timeout: float, auth: Any
+    ) -> FakeTransport:
         inst = FakeTransport(url, headers, timeout, sse_timeout, auth)
         transport_instances.append(inst)
         return inst
@@ -105,7 +115,7 @@ async def test_streamablehttp_client_raises_when_get_stream_starts(monkeypatch: 
     """Regression guard: stock streamable client still tries to attach SSE."""
 
     class RaisingTransport(FakeTransport):
-        """Record the SDK behaviour: register GET stream and let it raise."""
+        """Record the SDK behavior: register GET stream and let it raise."""
 
         async def handle_get_stream(self, *_: Any) -> None:
             raise SentinelError("GET stream started")
@@ -126,7 +136,9 @@ async def test_streamablehttp_client_raises_when_get_stream_starts(monkeypatch: 
             except BaseException:  # pragma: no cover - cancelled by sentinel
                 pass
 
-    def transport_factory(url: str, headers: dict[str, str] | None, timeout: float, sse_timeout: float, auth: Any) -> RaisingTransport:
+    def transport_factory(
+        url: str, headers: dict[str, str] | None, timeout: float, sse_timeout: float, auth: Any
+    ) -> RaisingTransport:
         return RaisingTransport(url, headers, timeout, sse_timeout, auth)
 
     @asynccontextmanager
