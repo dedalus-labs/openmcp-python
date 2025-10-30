@@ -182,7 +182,19 @@ def normalize_resource_payload(uri: str, declared_mime: str | None, payload: Any
     )
 
 
-def _jsonify(value: Any) -> Any:
+def _jsonify(value: Any, _depth: int = 0) -> Any:
+    """Recursively convert value to JSON-compatible types.
+
+    Args:
+        value: The value to convert
+        _depth: Internal recursion depth counter (max 100)
+
+    Returns:
+        JSON-compatible value or _JSONIFY_SENTINEL if not convertible
+    """
+    if _depth > 100:
+        return _JSONIFY_SENTINEL
+
     if is_dataclass(value):
         value = asdict(value)
     elif BaseModel and isinstance(value, BaseModel) and not isinstance(value, _CONTENT_CLASSES):
@@ -194,7 +206,7 @@ def _jsonify(value: Any) -> Any:
     if isinstance(value, dict):
         result: dict[str, Any] = {}
         for key, sub in value.items():
-            json_sub = _jsonify(sub)
+            json_sub = _jsonify(sub, _depth + 1)
             if json_sub is _JSONIFY_SENTINEL:
                 return _JSONIFY_SENTINEL
             result[str(key)] = json_sub
@@ -203,7 +215,7 @@ def _jsonify(value: Any) -> Any:
     if isinstance(value, (list, tuple, set)):
         result_list: list[Any] = []
         for item in value:
-            json_item = _jsonify(item)
+            json_item = _jsonify(item, _depth + 1)
             if json_item is _JSONIFY_SENTINEL:
                 return _JSONIFY_SENTINEL
             result_list.append(json_item)

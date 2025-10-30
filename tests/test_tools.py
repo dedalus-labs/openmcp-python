@@ -12,10 +12,10 @@ from tests.helpers import DummySession, run_with_context
 
 
 @pytest.mark.asyncio
-async def test_collecting_registers_tools():
+async def test_binding_registers_tools():
     server = MCPServer("demo")
 
-    with server.collecting():
+    with server.binding():
 
         @tool(description="Adds two numbers")
         def add(a: int, b: int) -> int:
@@ -36,7 +36,7 @@ async def test_allowlist_controls_visibility():
     server = MCPServer("demo")
     server.allow_tools(["slow"])
 
-    with server.collecting():
+    with server.binding():
 
         @tool()
         def add(a: int, b: int) -> int:
@@ -58,7 +58,7 @@ async def test_allowlist_controls_visibility():
 
 
 @pytest.mark.asyncio
-async def test_registering_outside_collecting():
+async def test_registering_outside_binding():
     server = MCPServer("demo")
 
     @tool(description="Multiply numbers")
@@ -110,7 +110,7 @@ async def test_serve_dispatch(monkeypatch):
 def test_type_adapter_schema():
     server = MCPServer("schema")
 
-    with server.collecting():
+    with server.binding():
 
         @tool()
         def analytics(a: int, count: int = 1, tags: list[str] | None = None):
@@ -205,7 +205,7 @@ async def test_tools_list_cursor_past_end():
 async def test_tools_metadata_fields_present():
     server = MCPServer("tools-metadata")
 
-    with server.collecting():
+    with server.binding():
 
         @tool(
             description="Adds two numbers",
@@ -238,7 +238,7 @@ async def test_tool_output_schema_inferred_from_return_type():
     class Result:
         total: int
 
-    with server.collecting():
+    with server.binding():
 
         @tool()
         async def sum_values(values: list[int]) -> Result:

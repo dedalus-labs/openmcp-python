@@ -42,7 +42,7 @@ async def _exercise_transport(
 
     uri = "resource://demo/file"
 
-    with server.collecting():
+    with server.binding():
 
         @resource(uri, description="Integration resource")
         def demo_resource() -> str:

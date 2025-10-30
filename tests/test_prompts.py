@@ -20,7 +20,7 @@ from tests.helpers import DummySession, run_with_context
 async def test_prompt_registration_and_rendering() -> None:
     server = MCPServer("prompts")
 
-    with server.collecting():
+    with server.binding():
 
         @prompt(
             "greet",
@@ -47,7 +47,7 @@ async def test_prompt_registration_and_rendering() -> None:
 async def test_prompt_missing_argument_raises_mcp_error() -> None:
     server = MCPServer("prompts-missing")
 
-    with server.collecting():
+    with server.binding():
 
         @prompt(
             "needs-arg",
@@ -76,7 +76,7 @@ async def test_prompt_unknown_name_raises_mcp_error() -> None:
 async def test_prompt_custom_mapping_result() -> None:
     server = MCPServer("prompts-mapping")
 
-    with server.collecting():
+    with server.binding():
 
         @prompt("status")
         async def status_prompt(_: dict[str, str]):
@@ -96,7 +96,7 @@ async def test_prompt_custom_mapping_result() -> None:
 async def test_prompt_none_result_produces_empty_messages() -> None:
     server = MCPServer("prompts-none")
 
-    with server.collecting():
+    with server.binding():
 
         @prompt("noop", description="No output")
         def noop(arguments: dict[str, str] | None = None):  # pragma: no cover - invoked below
@@ -111,7 +111,7 @@ async def test_prompt_none_result_produces_empty_messages() -> None:
 async def test_prompts_list_pagination() -> None:
     server = MCPServer("prompts-pagination")
 
-    with server.collecting():
+    with server.binding():
         for idx in range(120):
             def make_prompt(i: int):
                 @prompt(f"prompt-{i:03d}")
@@ -146,7 +146,7 @@ async def test_prompts_list_pagination() -> None:
 async def test_prompts_list_invalid_cursor() -> None:
     server = MCPServer("prompts-invalid-cursor")
 
-    with server.collecting():
+    with server.binding():
 
         @prompt("one")
         def _one(arguments: dict[str, str] | None = None):
@@ -165,7 +165,7 @@ async def test_prompts_list_invalid_cursor() -> None:
 async def test_prompts_list_cursor_past_end() -> None:
     server = MCPServer("prompts-past-end")
 
-    with server.collecting():
+    with server.binding():
         for idx in range(2):
 
             @prompt(f"prompt-{idx}")

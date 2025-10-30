@@ -101,17 +101,15 @@ class ResourcesService:
                 data = spec.fn()
         except Exception as exc:  # pragma: no cover - defensive
             text = f"Resource error: {exc}"
-            return types.ReadResourceResult(
-                contents=[
-                    types.TextResourceContents(
-                        uri=uri,
-                        mimeType="text/plain",
-                        text=text,
-                    )
-                ]
+            fallback = types.TextResourceContents(
+                uri=uri,
+                mimeType="text/plain",
+                text=text,
             )
+            return types.ReadResourceResult(contents=[fallback])
 
-        return normalize_resource_payload(uri, spec.mime_type, data)
+        normalized = normalize_resource_payload(uri, spec.mime_type, data)
+        return normalized
 
     # ------------------------------------------------------------------
     # Subscriptions

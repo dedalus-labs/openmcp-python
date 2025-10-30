@@ -25,6 +25,13 @@ rebinding protection on the HTTP transport by default. The server validates the
 * `127.0.0.1:*` and `localhost:*`
 * `https://as.dedaluslabs.ai` – our forthcoming central authorization service
 
+When authorization is enabled, the transport also serves OAuth Protected Resource Metadata at
+`/.well-known/oauth-protected-resource` and issues `WWW-Authenticate` challenges per RFC 9728.
+Every HTTP request must include the negotiated `MCP-Protocol-Version` header and, once the server
+has issued a session, `Mcp-Session-Id`. The transport enforces these requirements with 400
+responses, mirroring the rules described in `docs/mcp/core/transports/streamable-http.md`.
+Clients can cache metadata aggressively thanks to the `Cache-Control` headers emitted by the server.
+
 Override the configuration when constructing the server:
 
 ```python

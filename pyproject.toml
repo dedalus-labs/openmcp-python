@@ -128,10 +128,12 @@ default-groups = ["dev"] # Include dev group by default
 # Exclude patterns for cleaner builds
 exclude = [
     "dist",
+		"docs",
     "**/__pycache__",
     "**/build",
     "**/.pytest_cache",
     "**/.mypy_cache",
+    "internals",
 ]
 
 # Performance optimizations

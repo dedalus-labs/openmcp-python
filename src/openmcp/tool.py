@@ -2,14 +2,8 @@
 
 This module implements the ambient registration pattern discussed in the
 framework design notes.  When an :class:`~openmcp.server.MCPServer`
-instance enters its :meth:`collecting <openmcp.server.MCPServer.collecting>`
+instance enters its :meth:`binding <openmcp.server.MCPServer.binding>`
 context, decorated functions are automatically registered as MCP tools.
-
-The decorator design references the dynamic registration ideas captured in the
-internal DX exploration and adheres to the MCP specification sections on
-``tools/list`` and ``tools/call`` (see
-``docs/mcp/spec/schema-reference/tools-list.md`` and
-``docs/mcp/spec/schema-reference/tools-call.md``).
 """
 
 from __future__ import annotations
@@ -57,7 +51,7 @@ _ACTIVE_SERVER: ContextVar["MCPServer | None"] = ContextVar("_openmcp_active_ser
 
 
 def get_active_server() -> "MCPServer | None":
-    """Return the server currently collecting tool definitions, if any."""
+    """Return the server currently binding tool definitions, if any."""
     return _ACTIVE_SERVER.get()
 
 
@@ -72,13 +66,16 @@ def reset_active_server(token: Any) -> None:
 
 
 def _coerce_tags(tags: Iterable[str] | None) -> set[str]:
-    return set(tags or ())
+    if not tags:
+        return set()
+    result = {str(tag).strip() for tag in tags if str(tag).strip()}
+    return result
 
 
 def tool(
     name: str | None = None,
     *,
-    description: str = "",
+    description: str | None = None,
     tags: Iterable[str] | None = None,
     input_schema: dict[str, Any] | None = None,
     enabled: Callable[["MCPServer"], bool] | None = None,
@@ -90,16 +87,16 @@ def tool(
     """Decorator that marks a callable as an MCP tool.
 
     The decorator attaches a :class:`ToolSpec` to the function and, if a server
-    is actively collecting, registers it immediately.  This mirrors the DX
-    discussed in the design conversation, where developers write plain
-    functions and rely on an ambient scope for registration.
+    is actively binding, registers it immediately.
     """
 
     def decorator(fn: ToolFn) -> ToolFn:
+        desc = (description if description is not None else (fn.__doc__ or "")).strip()
+
         spec = ToolSpec(
             name=name or fn.__name__ or "anonymous",
             fn=fn,
-            description=description,
+            description=desc,
             tags=_coerce_tags(tags),
             input_schema=input_schema,
             enabled=enabled,

@@ -11,7 +11,7 @@ from openmcp import MCPServer, completion, prompt
 
 server = MCPServer("complete-demo")
 
-with server.collecting():
+with server.binding():
     @prompt("greet", arguments=[{"name": "name", "required": True}])
     def greet_prompt(args: dict[str, str]):
         return [("user", f"Greet {args['name']}")]

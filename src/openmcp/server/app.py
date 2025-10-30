@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import wraps
+import base64
 import inspect
 from typing import Any, Literal, TYPE_CHECKING
 from collections.abc import Callable, Iterable, Mapping
@@ -24,6 +25,7 @@ from mcp.server.lowlevel.server import (
     lifespan as default_lifespan,
     request_ctx,
 )
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.models import InitializationOptions
 from mcp.shared.exceptions import McpError
 from mcp.shared.session import RequestResponder
@@ -54,6 +56,7 @@ from ..tool import (
     set_active_server as set_tool_server,
 )
 from ..utils import get_logger
+from .authorization import AuthorizationConfig, AuthorizationManager, AuthorizationProvider
 from .services import (
     CompletionService,
     LoggingService,
@@ -105,6 +108,7 @@ class MCPServer(Server[Any, Any]):
         transport: str | None = None,
         notification_sink: NotificationSink | None = None,
         http_security: TransportSecuritySettings | None = None,
+        authorization: AuthorizationConfig | None = None,
     ) -> None:
         self._notification_flags = notification_flags or NotificationFlags()
         self._experimental_capabilities = {
@@ -159,6 +163,10 @@ class MCPServer(Server[Any, Any]):
             http_security if http_security is not None else self._default_http_security_settings()
         )
 
+        self._authorization_manager: AuthorizationManager | None = None
+        if authorization and authorization.enabled:
+            self._authorization_manager = AuthorizationManager(authorization)
+
         self._transport_factories: dict[str, TransportFactory] = {}
         self.register_transport("stdio", lambda server: StdioTransport(server))
         stream_http_factory = lambda server: StreamableHTTPTransport(
@@ -182,8 +190,22 @@ class MCPServer(Server[Any, Any]):
             return await self.resources.list_resources(request)
 
         @self.read_resource()
-        async def _read_resource(uri: types.AnyUrl) -> types.ReadResourceResult:
-            return await self.resources.read(str(uri))
+        async def _read_resource(uri: types.AnyUrl) -> list[ReadResourceContents]:
+            result = await self.resources.read(str(uri))
+            converted: list[ReadResourceContents] = []
+            for item in result.contents:
+                if isinstance(item, types.TextResourceContents):
+                    converted.append(
+                        ReadResourceContents(content=item.text, mime_type=item.mimeType)
+                    )
+                elif isinstance(item, types.BlobResourceContents):
+                    data = base64.b64decode(item.blob)
+                    converted.append(
+                        ReadResourceContents(content=data, mime_type=item.mimeType)
+                    )
+                else:  # pragma: no cover - defensive
+                    raise TypeError(f"Unsupported resource content type: {type(item)!r}")
+            return converted
 
         @self.list_resource_templates()
         async def _list_templates(request: types.ListResourceTemplatesRequest) -> types.ListResourceTemplatesResult:
@@ -195,8 +217,21 @@ class MCPServer(Server[Any, Any]):
             return await self.tools.list_tools(request)
 
         @self.call_tool(validate_input=False)
-        async def _call_tool(name: str, arguments: dict[str, Any] | None) -> types.CallToolResult:
-            return await self.tools.call_tool(name, arguments or {})
+        async def _call_tool(
+            name: str,
+            arguments: dict[str, Any] | None,
+        ) -> tuple[list[types.ContentBlock], dict[str, Any] | None]:
+            result = await self.tools.call_tool(name, arguments or {})
+            if result.isError:
+                message = "Tool execution failed"
+                if result.content:
+                    first = result.content[0]
+                    if isinstance(first, types.TextContent) and first.text:
+                        message = first.text
+                raise McpError(types.ErrorData(code=types.INTERNAL_ERROR, message=message))
+
+            structured = result.structuredContent if result.structuredContent is not None else None
+            return list(result.content), structured
 
         @self.completion()
         async def _completion_handler(
@@ -500,12 +535,21 @@ class MCPServer(Server[Any, Any]):
 
         return caps
 
+    @property
+    def authorization_manager(self) -> AuthorizationManager | None:
+        return self._authorization_manager
+
+    def set_authorization_provider(self, provider: AuthorizationProvider) -> None:
+        if self._authorization_manager is None:
+            raise RuntimeError("Authorization is not enabled for this server")
+        self._authorization_manager.set_provider(provider)
+
     # //////////////////////////////////////////////////////////////////
-    # Collecting context
+    # Binding context
     # //////////////////////////////////////////////////////////////////
 
     @contextmanager
-    def collecting(self):
+    def binding(self):
         tool_token = set_tool_server(self)
         resource_token = set_resource_server(self)
         completion_token = set_completion_server(self)
@@ -520,6 +564,7 @@ class MCPServer(Server[Any, Any]):
             reset_prompt_server(prompt_token)
             reset_resource_template_server(template_token)
 
+    
     # //////////////////////////////////////////////////////////////////
     # Transport registry
     # //////////////////////////////////////////////////////////////////

@@ -23,7 +23,7 @@ from tests.helpers import DummySession, FailingSession, run_with_context
 async def test_resource_registration_and_read():
     server = MCPServer("resources-demo")
 
-    with server.collecting():
+    with server.binding():
         @resource("resource://demo/greeting", name="greeting", description="Simple greeting")
         def greeting() -> str:
             return "hello world"
@@ -39,6 +39,34 @@ async def test_resource_registration_and_read():
 
     listed_resources = await server.invoke_resource("resource://demo/greeting")
     assert listed_resources.contents[0].text == "hello world"
+
+
+@pytest.mark.asyncio
+async def test_resource_service_read_returns_result_instance():
+    server = MCPServer("resources-read-result")
+
+    with server.binding():
+        @resource("resource://demo/direct")
+        def direct() -> str:
+            return "direct-value"
+
+    result = await server.resources.read("resource://demo/direct")
+    assert isinstance(result, types.ReadResourceResult)
+    assert result.contents and result.contents[0].text == "direct-value"
+
+
+@pytest.mark.asyncio
+async def test_resource_service_error_returns_result_wrapper():
+    server = MCPServer("resources-read-error")
+
+    with server.binding():
+        @resource("resource://demo/error")
+        def boom() -> str:  # pragma: no cover - executed via service
+            raise RuntimeError("boom")
+
+    result = await server.resources.read("resource://demo/error")
+    assert isinstance(result, types.ReadResourceResult)
+    assert result.contents and "Resource error" in result.contents[0].text
 
 
 @pytest.mark.anyio
@@ -92,7 +120,7 @@ async def test_resource_binary_content_encoding():
     payload = b"\x00\x01\x02demo"
     server = MCPServer("resources-binary")
 
-    with server.collecting():
+    with server.binding():
         @resource("resource://demo/binary", mime_type="application/octet-stream")
         def binary() -> bytes:
             return payload

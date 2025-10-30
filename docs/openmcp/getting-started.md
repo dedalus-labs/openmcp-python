@@ -4,7 +4,7 @@
 
 **Solution**: Standardize the bootstrapping workflow so every project gets the MCP handshake, capability advertisement, and transport selection right, without rewriting the same scaffolding.
 
-**OpenMCP**: `MCPServer` wraps the reference SDK with opinionated defaults. You supply a server name (plus optional metadata) and register capabilities within a short `collecting()` scope. Streamable HTTP is the default transport, but `serve(transport="stdio")` gives you parity with CLI runtimes.
+**OpenMCP**: `MCPServer` wraps the reference SDK with opinionated defaults. You supply a server name (plus optional metadata) and register capabilities within a short `binding()` scope. Streamable HTTP is the default transport, but `serve(transport="stdio")` gives you parity with CLI runtimes.
 
 ```python
 from openmcp import MCPServer, tool, get_context
@@ -15,7 +15,7 @@ server = MCPServer(
     version="0.1.0",
 )
 
-with server.collecting():
+with server.binding():
     @tool(description="Adds two numbers")
     async def add(a: int, b: int) -> int:
         ctx = get_context()  # raises LookupError outside a request

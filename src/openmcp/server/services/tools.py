@@ -65,8 +65,10 @@ class ToolsService:
         self._allow = set(names) if names is not None else None
         self._refresh_tools()
 
-    async def list_tools(self, request: types.ListToolsRequest) -> types.ListToolsResult:
-        cursor = request.params.cursor if request.params is not None else None
+    async def list_tools(self, request: types.ListToolsRequest | None) -> types.ListToolsResult:
+        cursor = None
+        if request is not None and request.params is not None:
+            cursor = request.params.cursor
         tools = list(self._tool_defs.values())
         page, next_cursor = paginate_sequence(tools, cursor, limit=self._pagination_limit)
         self.observers.remember_current_session()
@@ -117,7 +119,11 @@ class ToolsService:
             if not self._is_tool_enabled(spec):
                 continue
 
-            annotations_payload = spec.annotations or {}
+            annotations_payload: dict[str, Any] = dict(spec.annotations or {})
+            if spec.tags:
+                existing = annotations_payload.get("tags", [])
+                combined = {*(existing if isinstance(existing, (list, tuple, set)) else [existing]), *spec.tags}
+                annotations_payload["tags"] = sorted(str(tag) for tag in combined if tag not in (None, ""))
             if spec.title is not None and "title" not in annotations_payload:
                 annotations_payload = {**annotations_payload, "title": spec.title}
             annotations = None

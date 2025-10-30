@@ -15,7 +15,7 @@ def test_get_context_outside_request() -> None:
 async def test_tool_context_emits_logs_and_progress() -> None:
     server = MCPServer("ctx-tool")
 
-    with server.collecting():
+    with server.binding():
         @tool(description="exercise context helper")
         async def sample() -> str:
             ctx = get_context()
@@ -49,7 +49,7 @@ async def test_tool_context_emits_logs_and_progress() -> None:
 async def test_tool_context_no_progress_token_is_noop() -> None:
     server = MCPServer("ctx-tool-no-progress")
 
-    with server.collecting():
+    with server.binding():
         @tool(description="progress noop")
         async def sample() -> str:
             ctx = get_context()
@@ -69,7 +69,7 @@ async def test_resource_read_binds_context() -> None:
     server = MCPServer("ctx-resource")
     seen: list[tuple[str, int]] = []
 
-    with server.collecting():
+    with server.binding():
         @resource("resource://ctx", name="ctx")
         def sample() -> str:
             ctx = get_context()
@@ -91,7 +91,7 @@ async def test_prompt_renderer_binds_context() -> None:
     server = MCPServer("ctx-prompt")
     seen: list[str] = []
 
-    with server.collecting():
+    with server.binding():
         @prompt("ctx", description="ctx")
         def sample(arguments: dict[str, str] | None) -> list[tuple[str, str]]:
             ctx = get_context()
@@ -112,7 +112,7 @@ async def test_prompt_renderer_binds_context() -> None:
 async def test_call_tool_without_request_context_succeeds() -> None:
     server = MCPServer("ctx-direct-tool")
 
-    with server.collecting():
+    with server.binding():
         @tool(description="plain tool")
         async def sample() -> str:
             return "ok"
@@ -126,7 +126,7 @@ async def test_call_tool_without_request_context_succeeds() -> None:
 async def test_resource_read_without_request_context_succeeds() -> None:
     server = MCPServer("ctx-direct-resource")
 
-    with server.collecting():
+    with server.binding():
         @resource("resource://direct")
         def sample() -> str:
             return "ok"
@@ -140,7 +140,7 @@ async def test_resource_read_without_request_context_succeeds() -> None:
 async def test_prompt_get_without_request_context_succeeds() -> None:
     server = MCPServer("ctx-direct-prompt")
 
-    with server.collecting():
+    with server.binding():
         @prompt("direct", description="direct")
         def sample(arguments: dict[str, str] | None) -> list[tuple[str, str]]:
             return [("assistant", "hello")]

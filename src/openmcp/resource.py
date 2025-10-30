@@ -66,7 +66,7 @@ def resource(
 
     The decorated function must return ``str`` (text) or ``bytes`` (binary)
     content.  Registration happens immediately if inside
-    :meth:`openmcp.server.MCPServer.collecting`.
+    :meth:`openmcp.server.MCPServer.binding`.
     """
 
     def decorator(fn: ResourceFn) -> ResourceFn:

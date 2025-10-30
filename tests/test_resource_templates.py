@@ -12,7 +12,7 @@ from openmcp.resource_template import ResourceTemplateSpec
 async def test_resource_template_registration():
     server = MCPServer("template-demo")
 
-    with server.collecting():
+    with server.binding():
         @resource_template(
             "docs",
             uri_template="resource://docs/{path}",
@@ -33,7 +33,7 @@ async def test_resource_template_registration():
 async def test_resource_template_decorator_metadata_fields():
     server = MCPServer("template-metadata")
 
-    with server.collecting():
+    with server.binding():
 
         @resource_template(
             "docs",
@@ -58,7 +58,7 @@ async def test_resource_template_decorator_metadata_fields():
 
 
 @pytest.mark.anyio
-async def test_resource_template_registration_outside_collecting():
+async def test_resource_template_registration_outside_binding():
     server = MCPServer("template-register")
 
     @resource_template("assets", uri_template="resource://assets/{name}")

@@ -25,7 +25,7 @@ from openmcp import MCPServer, get_context, prompt, resource, tool, types
 
 server = MCPServer("hello-trip")
 
-with server.collecting():
+with server.binding():
 
     @tool(
         description="Summarize a travel plan",

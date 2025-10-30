@@ -51,8 +51,8 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# References / general testing
-references/
+# Internal materials for core maintainers
+internal/
 
 # Translations
 *.mo
@@ -243,8 +243,10 @@ tasks/
 # uv
 .uv-cache/
 
-# Claude Code
-.claude/
+# Coding agents
+**/.mcp.json
+**./agent/
+**/.claude/
 
 # Artifacts
 .artifacts/

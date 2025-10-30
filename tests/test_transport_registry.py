@@ -5,7 +5,7 @@ import pytest
 from mcp.server.transport_security import TransportSecuritySettings
 
 from openmcp.server import MCPServer
-from openmcp.server.transports import BaseTransport, StreamableHTTPTransport
+from openmcp.server.transports import BaseTransport, StreamableHTTPTransport, _validate_transport_headers
 
 
 class DummyTransport(BaseTransport):
@@ -42,9 +42,7 @@ def test_default_http_security_settings() -> None:
 
 def test_http_security_override() -> None:
     override = TransportSecuritySettings(
-        enable_dns_rebinding_protection=True,
-        allowed_hosts=["example.com:443"],
-        allowed_origins=["https://example.com"],
+        enable_dns_rebinding_protection=True, allowed_hosts=["example.com:443"], allowed_origins=["https://example.com"]
     )
 
     server = MCPServer("security-override", http_security=override)
@@ -57,3 +55,27 @@ def test_http_security_override() -> None:
 
     server.configure_streamable_http_security(None)
     assert server._http_security_settings != override
+
+
+def test_validate_transport_headers_requires_protocol() -> None:
+    class DummyRequest:
+        def __init__(self, headers: dict[str, str]) -> None:
+            self.headers = headers
+
+    request = DummyRequest({})
+    error = _validate_transport_headers(request, b"{}")
+    assert error == "Bad Request: Missing MCP-Protocol-Version header"
+
+
+def test_validate_transport_headers_requires_session_for_non_initialize() -> None:
+    class DummyRequest:
+        def __init__(self, headers: dict[str, str]) -> None:
+            self.headers = headers
+
+    request = DummyRequest({"MCP-Protocol-Version": "2025-06-18"})
+    error = _validate_transport_headers(request, b"{}")
+    assert error == "Bad Request: Missing Mcp-Session-Id header"
+
+    # initialization requests are exempt
+    body = b'{"jsonrpc": "2.0", "method": "initialize"}'
+    assert _validate_transport_headers(request, body) is None

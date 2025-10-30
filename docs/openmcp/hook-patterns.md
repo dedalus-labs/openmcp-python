@@ -15,7 +15,7 @@
 
    state = {"value": "initial"}
 
-   with server.collecting():
+   with server.binding():
 
        @resource("resource://demo/value")
        def read_value() -> str:

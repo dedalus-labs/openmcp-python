@@ -11,7 +11,7 @@ from openmcp import MCPServer, resource
 
 server = MCPServer("files")
 
-with server.collecting():
+with server.binding():
     @resource("resource://demo/readme", description="Project README")
     def readme() -> str:
         return "Welcome to the project!"

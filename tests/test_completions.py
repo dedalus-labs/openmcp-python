@@ -19,7 +19,7 @@ async def test_prompt_completion_registration() -> None:
 
     server = MCPServer("comp")
 
-    with server.collecting():
+    with server.binding():
 
         @completion(prompt="code_review")
         def language(argument: types.CompletionArgument, context: types.CompletionContext | None):
@@ -43,7 +43,7 @@ async def test_resource_completion_limit_enforced() -> None:
 
     long_list = [f"item-{i}" for i in range(150)]
 
-    with server.collecting():
+    with server.binding():
 
         @completion(resource="file:///{path}")
         def path_completion(argument: types.CompletionArgument, context: types.CompletionContext | None):
@@ -77,7 +77,7 @@ async def test_missing_completion_returns_empty() -> None:
 async def test_completion_result_dataclass() -> None:
     server = MCPServer("comp-result")
 
-    with server.collecting():
+    with server.binding():
 
         @completion(prompt="scenario")
         def scenario(argument: types.CompletionArgument, context: types.CompletionContext | None):
@@ -96,7 +96,7 @@ async def test_completion_result_dataclass() -> None:
 async def test_completion_mapping_with_has_more() -> None:
     server = MCPServer("comp-mapping")
 
-    with server.collecting():
+    with server.binding():
 
         @completion(resource="file:///{path}")
         def mapping_completion(argument: types.CompletionArgument, context: types.CompletionContext | None):
@@ -114,7 +114,7 @@ async def test_completion_mapping_with_has_more() -> None:
 async def test_completion_receives_context() -> None:
     server = MCPServer("comp-context")
 
-    with server.collecting():
+    with server.binding():
 
         @completion(prompt="contextual")
         def contextual(argument: types.CompletionArgument, context: types.CompletionContext | None):

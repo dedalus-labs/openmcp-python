@@ -10,6 +10,7 @@ from . import types
 from .context import Context, get_context
 from .client import MCPClient
 from .server import NotificationFlags, MCPServer
+from .server.authorization import AuthorizationConfig
 from .tool import tool
 from .resource import resource
 from .completion import completion, CompletionResult
@@ -31,4 +32,5 @@ __all__ = [
     "types",
     "Context",
     "get_context",
+    "AuthorizationConfig",
 ]
