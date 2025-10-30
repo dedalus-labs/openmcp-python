@@ -13,7 +13,7 @@ import pytest
 
 from openmcp.server import MCPServer
 from openmcp.server.transports import BaseTransport, StreamableHTTPTransport
-from openmcp.server.transports._starlette import SessionManagerHandler
+from openmcp.server.transports._asgi import SessionManagerHandler
 
 
 class DummyTransport(BaseTransport):

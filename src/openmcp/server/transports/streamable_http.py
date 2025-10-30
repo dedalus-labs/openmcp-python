@@ -14,7 +14,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.routing import Route
 
-from ._starlette import SessionManagerHandler, StarletteTransportBase
+from ._asgi import ASGITransportBase, SessionManagerHandler
 from ..._sdk_loader import ensure_sdk_importable
 
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from ..app import MCPServer
 
 
-class StreamableHTTPTransport(StarletteTransportBase):
+class StreamableHTTPTransport(ASGITransportBase):
     """Serve an :class:`openmcp.server.app.MCPServer` over Streamable HTTP."""
 
     TRANSPORT = ("streamable-http", "Streamable HTTP", "shttp", "sHTTP")

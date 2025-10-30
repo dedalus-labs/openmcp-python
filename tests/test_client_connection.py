@@ -165,7 +165,11 @@ async def test_streamable_http_preinitialize_get_requires_session(unused_tcp_por
         async with httpx.AsyncClient(timeout=2.0) as client:
             response = await client.get(f"http://{host}:{port}/mcp", headers=headers)
             assert response.status_code == 400
-            assert "Mcp-Session-Id" in response.text
+            payload = response.json()
+            error = payload.get("error", {})
+            assert error.get("code") == -32600
+            message = error.get("message", "").lower()
+            assert "missing" in message and "session" in message
 
         tg.cancel_scope.cancel()
         await anyio.sleep(0)
