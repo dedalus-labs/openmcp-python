@@ -6,12 +6,15 @@
 
 """Prompt capability service.
 
-Implements the spec receipts documented in:
+Implements the prompts capability as specified in the Model Context Protocol:
 
-- ``docs/mcp/capabilities/prompts`` (capabilities, protocol messages, listChanged)
-- ``docs/mcp/spec/schema-reference/prompts-list.md``
-- ``docs/mcp/spec/schema-reference/prompts-get.md``
-- ``docs/mcp/capabilities/pagination`` for cursor handling
+- https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+  (prompts capability, list and get operations, list-changed notifications)
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+  (cursor-based pagination for prompts/list)
+
+Handles prompt registration, argument validation, and result coercion from
+various return types (GetPromptResult, tuples, dicts) to MCP message format.
 """
 
 from __future__ import annotations

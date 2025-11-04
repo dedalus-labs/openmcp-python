@@ -6,7 +6,10 @@
 
 """Resource template registration utilities for OpenMCP.
 
-Follows ``docs/mcp/spec/schema-reference/resources-templates-list.md``.
+Implements resource templates as specified in the Model Context Protocol:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+  (resource templates with URI template patterns)
 """
 
 from __future__ import annotations

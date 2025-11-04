@@ -4,7 +4,15 @@
 #               github.com/dedalus-labs/openmcp-python/LICENSE
 # ==============================================================================
 
-"""Ping helpers for MCP servers (docs/mcp/spec/schema-reference/ping.md)."""
+"""Ping helpers for MCP servers.
+
+Implements ping/pong keepalive as specified in the Model Context Protocol:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/ping
+
+Includes phi-accrual failure detection for adaptive suspicion scoring and EWMA
+RTT tracking beyond basic spec requirements.
+"""
 
 from __future__ import annotations
 

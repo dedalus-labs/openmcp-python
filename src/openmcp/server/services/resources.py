@@ -6,13 +6,15 @@
 
 """Resource capability service (resources, templates, subscriptions).
 
-Spec receipts covered here:
+Implements the resources capability as specified in the Model Context Protocol:
 
-- ``docs/mcp/capabilities/resources`` (capabilities, protocol messages, subscriptions)
-- ``docs/mcp/spec/schema-reference/resources-list.md`` / ``resources-read.md``
-- ``docs/mcp/spec/schema-reference/resources-templates-list.md``
-- ``docs/mcp/spec/schema-reference/resources-subscribe.md``
-- ``docs/mcp/capabilities/pagination`` for cursor behavior
+- https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+  (resources capability, list/read/subscribe operations, templates, notifications)
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+  (cursor-based pagination for resources/list and templates/list)
+
+Manages resource registration, subscription lifecycle with session weak references,
+resource update notifications, and list-changed broadcasts.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from ..adapters import normalize_resource_payload
+from ..result_normalizers import normalize_resource_payload
 from ..notifications import NotificationSink, ObserverRegistry
 from ..pagination import paginate_sequence
 from ..subscriptions import SubscriptionManager

@@ -6,10 +6,11 @@
 
 """Re-export of the MCP schema bindings.
 
-The MCP schema (``docs/mcp/spec/schema-reference/index.md``) defines the
-canonical JSON structures exchanged between clients and servers.  The reference
-SDK already provides generated Pydantic models under ``mcp.types``; this module
-re-exports them so consumers of :mod:`openmcp` can rely on a single import site.
+The MCP specification (https://modelcontextprotocol.io/specification/2025-06-18)
+defines canonical JSON-RPC structures exchanged between clients and servers.
+The reference SDK provides generated Pydantic models under ``mcp.types``; this
+module re-exports them so consumers of :mod:`openmcp` can rely on a single
+import site.
 """
 
 from __future__ import annotations

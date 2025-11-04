@@ -39,7 +39,7 @@ from mcp.shared._httpx_utils import (  # type: ignore  # noqa: E402
 )
 from mcp.types import LATEST_PROTOCOL_VERSION, Implementation  # type: ignore  # noqa: E402
 
-from .app import ClientCapabilitiesConfig, MCPClient
+from .core import ClientCapabilitiesConfig, MCPClient
 from .transports import lambda_http_client
 
 

@@ -80,7 +80,7 @@ class SessionFactory:
 @pytest.mark.anyio
 async def test_client_initializes_without_optional_capabilities(monkeypatch: pytest.MonkeyPatch) -> None:
     factory = SessionFactory()
-    monkeypatch.setattr("openmcp.client.app.ClientSession", factory)
+    monkeypatch.setattr("openmcp.client.core.ClientSession", factory)
 
     recv, send = anyio.create_memory_object_stream(0)
     async with MCPClient(recv, send) as client:
@@ -95,7 +95,7 @@ async def test_client_initializes_without_optional_capabilities(monkeypatch: pyt
 @pytest.mark.anyio
 async def test_client_enables_roots_and_sends_notification(monkeypatch: pytest.MonkeyPatch) -> None:
     factory = SessionFactory()
-    monkeypatch.setattr("openmcp.client.app.ClientSession", factory)
+    monkeypatch.setattr("openmcp.client.core.ClientSession", factory)
 
     recv, send = anyio.create_memory_object_stream(0)
     capabilities = ClientCapabilitiesConfig(enable_roots=True, initial_roots=[{"uri": "file:///tmp"}])
@@ -112,7 +112,7 @@ async def test_client_enables_roots_and_sends_notification(monkeypatch: pytest.M
 @pytest.mark.anyio
 async def test_client_cancel_request_sends_notification(monkeypatch: pytest.MonkeyPatch) -> None:
     factory = SessionFactory()
-    monkeypatch.setattr("openmcp.client.app.ClientSession", factory)
+    monkeypatch.setattr("openmcp.client.core.ClientSession", factory)
 
     recv, send = anyio.create_memory_object_stream(0)
     async with MCPClient(recv, send) as client:
@@ -128,7 +128,7 @@ async def test_client_cancel_request_sends_notification(monkeypatch: pytest.Monk
 @pytest.mark.anyio
 async def test_send_request_and_ping_delegate_to_session(monkeypatch: pytest.MonkeyPatch) -> None:
     factory = SessionFactory()
-    monkeypatch.setattr("openmcp.client.app.ClientSession", factory)
+    monkeypatch.setattr("openmcp.client.core.ClientSession", factory)
 
     recv, send = anyio.create_memory_object_stream(0)
     async with MCPClient(recv, send) as client:
@@ -147,7 +147,7 @@ async def test_send_request_and_ping_delegate_to_session(monkeypatch: pytest.Mon
 @pytest.mark.anyio
 async def test_sampling_and_elicitation_handlers_wrapped(monkeypatch: pytest.MonkeyPatch) -> None:
     factory = SessionFactory()
-    monkeypatch.setattr("openmcp.client.app.ClientSession", factory)
+    monkeypatch.setattr("openmcp.client.core.ClientSession", factory)
 
     async def sampling_handler(ctx: Any, params: types.CreateMessageRequestParams) -> types.CreateMessageResult:
         content = types.TextContent(type="text", text="ok")

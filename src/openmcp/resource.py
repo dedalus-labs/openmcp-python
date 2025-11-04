@@ -6,12 +6,13 @@
 
 """Resource registration utilities for OpenMCP.
 
-Follows the guidance in:
-* ``docs/mcp/capabilities/resources/index.md``
-* ``docs/mcp/spec/schema-reference/resources-list.md``
-* ``docs/mcp/spec/schema-reference/resources-read.md``
+Implements the resources capability as specified in the Model Context Protocol:
 
-Usage mirrors the :mod:`openmcp.tool` ambient registration pattern.
+- https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+  (resources capability, list and read operations)
+
+Usage mirrors the :mod:`openmcp.tool` ambient registration pattern. Decorated
+functions return text (str) or binary (bytes) content for resource URIs.
 """
 
 from __future__ import annotations

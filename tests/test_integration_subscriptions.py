@@ -152,7 +152,13 @@ async def test_streamable_http_subscription_end_to_end(monkeypatch: pytest.Monke
 
     def patch_streamable_http(monkeypatch: pytest.MonkeyPatch, recv, send) -> None:
         async def fake_run(
-            self, *, host: str, port: int, path: str, log_level: str, uvicorn_options: dict[str, object]
+            self,
+            *,
+            host: str,
+            port: int,
+            path: str,
+            log_level: str,
+            **uvicorn_options: object,
         ) -> None:
             init_options = self._server.create_initialization_options()
             await self._server.run(
@@ -163,7 +169,7 @@ async def test_streamable_http_subscription_end_to_end(monkeypatch: pytest.Monke
                 stateless=False,
             )
 
-        monkeypatch.setattr("openmcp.server.transports.streamable_http.StreamableHTTPTransport._run_server", fake_run)
+        monkeypatch.setattr("openmcp.server.transports.streamable_http.StreamableHTTPTransport.run", fake_run, raising=False)
 
     init_result, notifications, (before_updates, after_updates) = await _exercise_transport(
         monkeypatch, patch_streamable_http, start

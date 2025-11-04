@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from mcp.shared.exceptions import McpError
 import pytest
@@ -15,6 +15,7 @@ import pytest
 from openmcp import NotificationFlags, types
 from openmcp.server import MCPServer
 from openmcp.tool import tool
+from openmcp.utils.schema import resolve_output_schema
 from tests.helpers import DummySession, run_with_context
 
 
@@ -261,6 +262,107 @@ async def test_tool_output_schema_inferred_from_return_type():
 
 
 @pytest.mark.anyio
+async def test_tool_output_schema_handles_nested_dataclasses():
+    server = MCPServer("tools-output-nested")
+
+    with server.binding():
+
+        @tool()
+        async def describe_profile(name: str, street: str | None = None) -> NestedProfile:
+            addr = NestedAddress(street=street or "Unknown", postal_code=94107)
+            return NestedProfile(name=name, address=addr if street else None, tags=["example"])
+
+    tool_def = server.tools.definitions["describe_profile"]
+    schema = tool_def.outputSchema
+    assert schema is not None
+    expected = resolve_output_schema(NestedProfile).schema
+    expected.pop("$defs", None)
+    assert schema == expected
+
+    result = await server.tools.call_tool("describe_profile", {"name": "Ada", "street": "Market"})
+    assert result.structuredContent == {
+        "name": "Ada",
+        "address": {"street": "Market", "postal_code": 94107},
+        "tags": ["example"],
+    }
+
+
+@pytest.mark.anyio
+async def test_tool_output_schema_supports_union_types():
+    server = MCPServer("tools-output-union")
+
+    with server.binding():
+
+        @tool()
+        async def choose_action(chat: bool) -> UnionAction:
+            if chat:
+                return UnionAction(kind="chat", payload={"message": "hi"})
+            return UnionAction(kind="navigate", payload={"url": "https://example.com"})
+
+    tool_def = server.tools.definitions["choose_action"]
+    schema = tool_def.outputSchema
+    assert schema is not None
+    expected = resolve_output_schema(UnionAction).schema
+    expected.pop("$defs", None)
+    assert schema == expected
+
+    result = await server.tools.call_tool("choose_action", {"chat": False})
+    assert result.structuredContent == {
+        "kind": "navigate",
+        "payload": {"url": "https://example.com"},
+    }
+
+
+@pytest.mark.anyio
+async def test_tool_output_schema_explicit_pass_through():
+    server = MCPServer("tools-output-explicit")
+
+    explicit_schema = {
+        "type": "object",
+        "properties": {
+            "value": {"type": "number"},
+            "unit": {"type": "string"},
+        },
+        "required": ["value", "unit"],
+        "additionalProperties": False,
+    }
+
+    with server.binding():
+
+        @tool(output_schema=explicit_schema)
+        async def measure() -> dict[str, Any]:
+            return {"value": 42, "unit": "ms"}
+
+    specification = server.tools.definitions["measure"]
+    schema = specification.outputSchema
+    assert schema["properties"] == explicit_schema["properties"]
+    assert schema["required"] == explicit_schema["required"]
+
+    result = await server.tools.call_tool("measure", {})
+    assert result.structuredContent == {"value": 42, "unit": "ms"}
+
+
+@pytest.mark.anyio
+async def test_tool_output_schema_boxes_scalars():
+    server = MCPServer("tools-output-scalar")
+
+    with server.binding():
+
+        @tool()
+        async def answer() -> int:
+            return 7
+
+    schema = server.tools.definitions["answer"].outputSchema
+    assert schema is not None
+    assert schema["type"] == "object"
+    assert schema["properties"] == {"result": {"type": "integer"}}
+    assert schema["required"] == ["result"]
+
+    result = await server.tools.call_tool("answer", {})
+    assert result.structuredContent == {"result": 7}
+
+
+@pytest.mark.anyio
 async def test_tools_list_changed_notification_enabled():
     server = MCPServer("tools-list-changed", notification_flags=NotificationFlags(tools_changed=True))
     handler = server.request_handlers[types.ListToolsRequest]
@@ -283,3 +385,20 @@ async def test_tools_list_changed_notification_disabled():
     await server.notify_tools_list_changed()
 
     assert all(note.root.method != "notifications/tools/list_changed" for note in session.notifications)
+@dataclass
+class NestedAddress:
+    street: str
+    postal_code: int
+
+
+@dataclass
+class NestedProfile:
+    name: str
+    address: NestedAddress | None
+    tags: list[str]
+
+
+@dataclass
+class UnionAction:
+    kind: Literal["chat", "navigate"]
+    payload: dict[str, Any]

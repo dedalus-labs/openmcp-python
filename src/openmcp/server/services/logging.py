@@ -6,12 +6,13 @@
 
 """Logging capability service.
 
-Implements the ``logging/setLevel`` request and bridges Python's logging system
-to MCP ``notifications/message`` events, as described in the spec receipts:
+Implements the logging capability as specified in the Model Context Protocol:
 
-- ``docs/mcp/spec/schema-reference/logging-setlevel.md``
-- ``docs/mcp/spec/schema-reference/notifications-message.md``
-- ``docs/mcp/capabilities/logging``
+- https://modelcontextprotocol.io/specification/2025-06-18/server/logging
+  (logging capability, setLevel request, message notifications)
+
+Bridges Python's logging system to MCP message notifications with per-session
+level filtering and automatic handler installation.
 """
 
 from __future__ import annotations

@@ -6,17 +6,17 @@
 
 """Roots capability support for MCP servers.
 
-Implements the cache-aside pattern described in:
-- docs/mcp/capabilities/roots/index.md
-- docs/mcp/spec/schema-reference/roots-list.md
-- docs/mcp/spec/schema-reference/notifications-roots-list-changed.md
+Implements the roots capability as specified in the Model Context Protocol:
 
-Each active session maintains an immutable snapshot of the client's advertised
-roots alongside a :class:`RootGuard` used to validate filesystem access. The
-service fetches a fresh snapshot when a session is created and whenever the
-client emits ``notifications/roots/list_changed``. Each snapshot revision
-produces a monotonic version so pagination cursors remain stable across
-refreshes.
+- https://modelcontextprotocol.io/specification/2025-06-18/client/roots
+  (client-advertised filesystem roots with list-changed notifications)
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+  (cursor-based pagination for roots/list)
+
+Implements cache-aside pattern where each session maintains immutable snapshots
+of client-advertised roots alongside RootGuard reference monitor for filesystem
+access validation. Supports debounced refresh on list-changed notifications with
+version-stable pagination cursors across snapshot updates.
 """
 
 from __future__ import annotations

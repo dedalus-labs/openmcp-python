@@ -11,13 +11,14 @@ from dataclasses import dataclass
 import json
 
 from openmcp import types
-from openmcp.server.adapters import normalize_resource_payload, normalize_tool_result
+from openmcp.server.result_normalizers import normalize_resource_payload, normalize_tool_result
 
 
 def test_normalize_tool_result_from_string() -> None:
     result = normalize_tool_result("hello")
     assert isinstance(result, types.CallToolResult)
-    assert result.content and result.content[0].text == "hello"
+    assert result.content
+    assert result.content[0].text == "hello"
     assert result.structuredContent == {"result": "hello"}
 
 

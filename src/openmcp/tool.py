@@ -6,10 +6,13 @@
 
 """Tool registration utilities for OpenMCP.
 
-This module implements the ambient registration pattern discussed in the
-framework design notes.  When an :class:`~openmcp.server.MCPServer`
-instance enters its :meth:`binding <openmcp.server.MCPServer.binding>`
-context, decorated functions are automatically registered as MCP tools.
+Implements the ambient registration pattern for MCP tools as specified in:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+
+When an :class:`~openmcp.server.MCPServer` instance enters its
+:meth:`binding <openmcp.server.MCPServer.binding>` context, decorated functions
+are automatically registered as MCP tools with schema inference from type hints.
 """
 
 from __future__ import annotations

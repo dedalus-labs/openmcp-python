@@ -31,7 +31,7 @@ def get_stdio_server():
 
 
 class StdioTransport(BaseTransport):
-    """Run an :class:`openmcp.server.app.MCPServer` over STDIO."""
+    """Run an :class:`openmcp.server.MCPServer` over STDIO."""
 
     TRANSPORT = ("stdio", "STDIO", "Standard IO")
 

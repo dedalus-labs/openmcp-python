@@ -6,11 +6,13 @@
 
 """Prompt registration utilities.
 
-Supports the ambient authoring model documented in
-``docs/mcp/capabilities/prompts/index.md``.  Registered callables back the
-``prompts/list`` and ``prompts/get`` RPCs described in
-``docs/mcp/spec/schema-reference/prompts-list.md`` and
-``docs/mcp/spec/schema-reference/prompts-get.md``.
+Implements the prompts capability as specified in the Model Context Protocol:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+  (prompts capability, list and get operations, argument handling)
+
+Supports the ambient authoring pattern where decorated callables are registered
+as prompt templates with the MCP server.
 """
 
 from __future__ import annotations
@@ -82,8 +84,7 @@ def prompt(
 ) -> Callable[[PromptFunction], PromptFunction]:
     """Register a prompt renderer.
 
-    Inspired by the prompt capability guidance in
-    ``docs/mcp/capabilities/prompts/protocol-messages.md``.
+    See: https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
     """
 
     def decorator(fn: PromptFunction) -> PromptFunction:

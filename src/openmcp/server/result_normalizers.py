@@ -7,12 +7,12 @@
 """Normalization helpers for server-facing handler results.
 
 The adapters keep the capability services thin while ensuring all outbound
-responses conform to the structures defined in the MCP specification.
+results conform to the structures defined in the MCP specification:
 
-Spec receipts referenced here:
-
-* ``docs/mcp/spec/schema-reference/tools-call.md``
-* ``docs/mcp/spec/schema-reference/resources-read.md``
+- https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+  (tools/call result normalization)
+- https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+  (resources/read result normalization)
 """
 
 from __future__ import annotations
@@ -194,6 +194,7 @@ def _jsonify(value: Any, _depth: int = 0) -> Any:
 
     Returns:
         JSON-compatible value or _JSONIFY_SENTINEL if not convertible
+
     """
     if _depth > 100:
         return _JSONIFY_SENTINEL

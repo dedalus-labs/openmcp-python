@@ -4,11 +4,15 @@
 #               github.com/dedalus-labs/openmcp-python/LICENSE
 # ==============================================================================
 
-"""Server-facing helpers for OpenMCP."""
+"""Public server-side surface for OpenMCP.
+
+The heavy lifting lives in :mod:`openmcp.server.core`; this module re-exports
+the framework primitives that host applications are expected to import.
+"""
 
 from __future__ import annotations
 
-from .app import MCPServer, NotificationFlags, TransportLiteral
+from .core import MCPServer, NotificationFlags, TransportLiteral
 
 
 __all__ = ["MCPServer", "NotificationFlags", "TransportLiteral"]

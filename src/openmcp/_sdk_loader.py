@@ -24,9 +24,8 @@ _SDK_RELATIVE_PATH = Path(__file__).resolve().parents[2] / "references" / "pytho
 def ensure_sdk_importable() -> None:
     """Make the ``mcp`` package importable.
 
-    The specification requires implementations to follow the canonical schema
-    (see ``docs/mcp/spec/schema-reference/index.md``) and lifecycle rules in
-    ``docs/mcp/core/lifecycle/lifecycle-phases.md``. Rather than re‑implementing
+    The MCP specification (https://modelcontextprotocol.io/specification/2025-06-18)
+    defines canonical schemas and lifecycle rules. Rather than re‑implementing
     the entire transport and schema layer, we reuse the reference SDK shipped in
     this repository.  If ``mcp`` is already on ``sys.path`` the function becomes a
     no-op; otherwise it appends the local SDK directory before importing it.

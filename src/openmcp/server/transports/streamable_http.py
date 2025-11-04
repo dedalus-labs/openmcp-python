@@ -14,7 +14,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.routing import Route
 
-from ._asgi import ASGITransportBase, SessionManagerHandler
+from ._asgi import ASGITransportBase, ASGITransportConfig, SessionManagerHandler
 from ..._sdk_loader import ensure_sdk_importable
 
 
@@ -23,18 +23,19 @@ ensure_sdk_importable()
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from ..app import MCPServer
+    from ..core import MCPServer
 
 
 class StreamableHTTPTransport(ASGITransportBase):
-    """Serve an :class:`openmcp.server.app.MCPServer` over Streamable HTTP."""
+    """Serve an :class:`openmcp.server.MCPServer` over Streamable HTTP."""
 
     TRANSPORT = ("streamable-http", "Streamable HTTP", "shttp", "sHTTP")
 
     def __init__(
         self, server: MCPServer, *, security_settings: TransportSecuritySettings | None = None, stateless: bool = False
     ) -> None:
-        super().__init__(server, security_settings=security_settings, stateless=stateless)
+        config = ASGITransportConfig(security_settings=security_settings, stateless=stateless)
+        super().__init__(server, config=config)
 
     def _build_session_manager(self) -> StreamableHTTPSessionManager:
         security = self.security_settings

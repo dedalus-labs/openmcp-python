@@ -16,9 +16,9 @@ the underlying ASGI server runtime.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Callable, Iterable  # noqa: TC003
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping  # noqa: TC003
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
 from starlette.applications import Starlette
@@ -28,10 +28,41 @@ from .base import BaseTransport
 
 
 if TYPE_CHECKING:
+    from starlette.routing import BaseRoute
     from starlette.types import Receive, Scope, Send
 
-    from ..app import MCPServer
+    from ..core import MCPServer
     from ..authorization import AuthorizationManager
+
+
+@dataclass(slots=True)
+class ASGITransportConfig:
+    """Configuration toggles that shape transport behaviour."""
+
+    security_settings: object | None = None
+    stateless: bool = False
+
+
+@dataclass(slots=True)
+class ASGIRunConfig:
+    """Runtime parameters for launching an ASGI transport."""
+
+    host: str | None = None
+    port: int | None = None
+    path: str | None = None
+    log_level: str | None = None
+    uvicorn_options: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class _ResolvedRunConfig:
+    """Internal helper that holds concrete ASGI run settings."""
+
+    host: str
+    port: int
+    path: str
+    log_level: str
+    uvicorn_options: dict[str, Any]
 
 
 class SessionManagerProtocol(Protocol):
@@ -81,41 +112,69 @@ class ASGITransportBase(BaseTransport, ABC):
     DEFAULT_PATH: str = "/mcp"
     DEFAULT_LOG_LEVEL: str = "info"
 
-    def __init__(self, server: MCPServer, *, security_settings: object | None = None, stateless: bool = False) -> None:
+    def __init__(self, server: MCPServer, *, config: ASGITransportConfig | None = None) -> None:
         super().__init__(server)
-        self._security_settings = security_settings
-        self._stateless = stateless
+        self._config = config or ASGITransportConfig()
 
     @property
     def security_settings(self) -> object | None:
         """Return the transport-specific security configuration, if any."""
-        return self._security_settings
+        return self._config.security_settings
 
     @property
     def stateless(self) -> bool:
         """Return ``True`` when incoming requests should be treated statelessly."""
-        return self._stateless
+        return self._config.stateless
 
-    async def run(
+    async def run(self, *, config: ASGIRunConfig | None = None, **legacy_kwargs: Any) -> None:
+        resolved = self._resolve_run_config(config=config, legacy_kwargs=legacy_kwargs)
+        await self._serve(resolved)
+
+    def _resolve_run_config(
         self,
         *,
-        host: str | None = None,
-        port: int | None = None,
-        path: str | None = None,
-        log_level: str | None = None,
-        **uvicorn_options: Any,
-    ) -> None:
-        host = host or self.DEFAULT_HOST
-        port = port or self.DEFAULT_PORT
-        path = path or self.DEFAULT_PATH
-        log_level = log_level or self.DEFAULT_LOG_LEVEL
+        config: ASGIRunConfig | None,
+        legacy_kwargs: dict[str, Any],
+    ) -> _ResolvedRunConfig:
+        if config is not None and legacy_kwargs:
+            raise TypeError("Cannot mix 'config' with legacy keyword arguments.")
 
-        await self._serve(host, port, path, log_level, uvicorn_options)
+        if config is None:
+            if legacy_kwargs:
+                extracted = {k: legacy_kwargs.pop(k) for k in ("host", "port", "path", "log_level") if k in legacy_kwargs}
+                config = ASGIRunConfig(
+                    host=extracted.get("host"),
+                    port=extracted.get("port"),
+                    path=extracted.get("path"),
+                    log_level=extracted.get("log_level"),
+                    uvicorn_options=dict(legacy_kwargs),
+                )
+            else:
+                config = ASGIRunConfig()
+        else:
+            # Normalize provided uvicorn options into a concrete dict we can mutate safely.
+            legacy_kwargs = {}
 
-    async def _serve(self, host: str, port: int, path: str, log_level: str, uvicorn_options: dict[str, Any]) -> None:
+        host = config.host or self.DEFAULT_HOST
+        port = config.port or self.DEFAULT_PORT
+        path = config.path or self.DEFAULT_PATH
+        log_level = config.log_level or self.DEFAULT_LOG_LEVEL
+
+        extra_options = dict(config.uvicorn_options)
+        extra_options.update(legacy_kwargs)
+
+        return _ResolvedRunConfig(
+            host=host,
+            port=port,
+            path=path,
+            log_level=log_level,
+            uvicorn_options=extra_options,
+        )
+
+    async def _serve(self, run_config: _ResolvedRunConfig) -> None:
         manager = self._build_session_manager()
         handler = self._build_handler(manager)
-        routes = list(self._build_routes(path=path, handler=handler))
+        routes = list(self._build_routes(path=run_config.path, handler=handler))
 
         authorization: AuthorizationManager | None = getattr(self.server, "authorization_manager", None)
         if authorization and authorization.enabled:
@@ -128,8 +187,14 @@ class ASGITransportBase(BaseTransport, ABC):
         if authorization and authorization.enabled:
             app = authorization.wrap_asgi(app)
 
-        config = Config(app=app, host=host, port=port, log_level=log_level, **uvicorn_options)
-        server_instance = Server(config)
+        uvicorn_config = Config(
+            app=app,
+            host=run_config.host,
+            port=run_config.port,
+            log_level=run_config.log_level,
+            **run_config.uvicorn_options,
+        )
+        server_instance = Server(uvicorn_config)
         await server_instance.serve()
 
     def _build_handler(self, manager: SessionManagerProtocol) -> SessionManagerHandler:
@@ -153,7 +218,12 @@ class ASGITransportBase(BaseTransport, ABC):
     def _build_session_manager(self) -> SessionManagerProtocol: ...
 
     @abstractmethod
-    def _build_routes(self, *, path: str, handler: SessionManagerHandler) -> Iterable[object]: ...
+    def _build_routes(self, *, path: str, handler: SessionManagerHandler) -> Iterable[BaseRoute]: ...
 
 
-__all__ = ["ASGITransportBase", "SessionManagerHandler"]
+__all__ = [
+    "ASGITransportBase",
+    "ASGITransportConfig",
+    "ASGIRunConfig",
+    "SessionManagerHandler",
+]

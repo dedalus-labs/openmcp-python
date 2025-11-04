@@ -4,18 +4,29 @@
 #               github.com/dedalus-labs/openmcp-python/LICENSE
 # ==============================================================================
 
-"""Tool capability service."""
+"""Tool capability service.
+
+Implements the tools capability as specified in the Model Context Protocol:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+  (tools capability declaration, list and call operations)
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+  (cursor-based pagination for tools/list)
+
+Supports ambient tool registration, argument schema inference from type hints,
+output schema inference with MCP content type blocklisting, and list-changed
+notifications per the specification requirements.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
 import inspect
 import types as pytypes
-from typing import Any, NotRequired, TypedDict, get_args, get_origin, get_type_hints
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, get_args, get_origin, get_type_hints
 
 from pydantic import TypeAdapter
 
-from ..adapters import normalize_tool_result
+from ..result_normalizers import normalize_tool_result
 from ..notifications import NotificationSink, ObserverRegistry
 from ..pagination import paginate_sequence
 from ... import types
@@ -25,16 +36,23 @@ from ...utils import maybe_await_with_args
 from ...utils.schema import SchemaError, resolve_output_schema
 
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+    from logging import Logger
+
+    from ..core import MCPServer
+
+
 class ToolsService:
     """Manages tool registration, invocation, and list notifications."""
 
     def __init__(
         self,
         *,
-        server_ref,
+        server_ref: MCPServer,
         attach_callable: Callable[[str, Callable[..., Any]], None],
         detach_callable: Callable[[str], None],
-        logger,
+        logger: Logger,
         pagination_limit: int,
         notification_sink: NotificationSink,
     ) -> None:
@@ -102,7 +120,8 @@ class ToolsService:
             )
 
         if isinstance(result, types.ServerResult):
-            raise RuntimeError("Tool returned types.ServerResult; return the nested CallToolResult instead.")
+            message = "Tool returned types.ServerResult; return the nested CallToolResult instead."
+            raise TypeError(message)
 
         return normalize_tool_result(result)
 
@@ -154,9 +173,9 @@ class ToolsService:
     def _is_tool_enabled(self, spec: ToolSpec) -> bool:
         if self._allow is not None and spec.name not in self._allow:
             return False
-        if spec.enabled is not None and not spec.enabled(self._server):
-            return False
-        return True
+        if spec.enabled is None:
+            return True
+        return bool(spec.enabled(self._server))
 
     def _build_input_schema(self, fn: Callable[..., Any]) -> dict[str, Any]:
         signature = inspect.signature(fn)
@@ -168,10 +187,10 @@ class ToolsService:
             if param.kind not in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY):
                 return {"type": "object"}
 
-            annotation = param.annotation if param.annotation is not inspect._empty else Any
+            annotation = param.annotation if param.annotation is not inspect.Parameter.empty else Any
             descriptions[name] = f"Parameter {name}"
 
-            if param.default is inspect._empty:
+            if param.default is inspect.Parameter.empty:
                 annotations[name] = annotation
             else:
                 annotations[name] = NotRequired[annotation]
@@ -187,7 +206,8 @@ class ToolsService:
 
         try:
             schema = TypeAdapter(typed_dict).json_schema()
-        except Exception:
+        except (TypeError, ValueError, NameError) as exc:  # pragma: no cover - pydantic raised unexpected error
+            self._logger.debug("Failed to derive input schema for %s: %s", fn.__name__, exc)
             return {"type": "object", "additionalProperties": True}
 
         schema.pop("$defs", None)
@@ -212,14 +232,25 @@ class ToolsService:
     def _build_output_schema(self, fn: Callable[..., Any]) -> dict[str, Any] | None:
         signature = inspect.signature(fn)
         annotation = signature.return_annotation
-        if annotation in (inspect.Signature.empty, inspect._empty, Any, None):  # type: ignore[attr-defined]
+        if annotation in (inspect.Signature.empty, Any, None):
             return None
 
         try:
-            resolved = get_type_hints(fn, include_extras=True)
+            closure_ns: dict[str, Any] = {}
+            if fn.__closure__:
+                for cell in fn.__closure__:
+                    try:
+                        value = cell.cell_contents
+                    except ValueError:
+                        continue
+                    name = getattr(value, "__name__", None)
+                    if isinstance(name, str):
+                        closure_ns.setdefault(name, value)
+
+            resolved = get_type_hints(fn, include_extras=True, localns=closure_ns)
             annotation = resolved.get("return", annotation)
-        except Exception:
-            pass
+        except (NameError, TypeError) as exc:  # pragma: no cover - deferred evaluation failed
+            self._logger.debug("Failed to resolve return annotation for %s: %s", fn.__name__, exc)
 
         if annotation in (Any, None, types.CallToolResult, types.ServerResult):
             return None
@@ -238,7 +269,7 @@ class ToolsService:
         return schema
 
 
-def _annotation_contains(annotation: Any, targets: tuple[type[Any], ...]) -> bool:
+def _annotation_contains(annotation: object, targets: tuple[type[Any], ...]) -> bool:
     origin = get_origin(annotation)
     if origin is None:
         return any(
@@ -249,7 +280,7 @@ def _annotation_contains(annotation: Any, targets: tuple[type[Any], ...]) -> boo
     return any(_annotation_contains(arg, targets) for arg in get_args(annotation))
 
 
-def _prune_titles(schema: Any) -> None:
+def _prune_titles(schema: object) -> None:
     if isinstance(schema, dict):
         schema.pop("title", None)
         for value in schema.values():

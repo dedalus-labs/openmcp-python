@@ -17,6 +17,11 @@ from openmcp.client import open_connection
 from openmcp.versioning import SUPPORTED_PROTOCOL_VERSIONS
 
 
+HTTP_OK = 200
+HTTP_BAD_REQUEST = 400
+JSONRPC_INVALID_REQUEST = -32600
+
+
 async def _wait_for_port(host: str, port: int, *, timeout: float = 5.0) -> None:
     with anyio.fail_after(timeout):
         while True:
@@ -68,7 +73,7 @@ async def test_open_connection_streamable_http(unused_tcp_port: int) -> None:
 
 @pytest.mark.anyio
 async def test_open_connection_unknown_transport() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported transport"):
         async with open_connection("whatever://", transport="bogus"):
             pass
 
@@ -109,14 +114,14 @@ async def test_streamable_http_allows_preinitialize_get(unused_tcp_port: int) ->
             }
 
             async with client.stream("POST", base_url, headers=post_headers, json=initialize_payload) as init_response:
-                assert init_response.status_code == 200
+                assert init_response.status_code == HTTP_OK
                 session_id = init_response.headers.get("Mcp-Session-Id")
                 assert session_id
 
             get_headers = {"MCP-Protocol-Version": version, "Mcp-Session-Id": session_id, "Accept": "text/event-stream"}
 
             async with client.stream("GET", base_url, headers=get_headers) as response:
-                assert response.status_code == 200
+                assert response.status_code == HTTP_OK
 
         tg.cancel_scope.cancel()
         await anyio.sleep(0)
@@ -138,9 +143,10 @@ async def test_streamable_http_stateless_allows_preinitialize_get(unused_tcp_por
 
         headers = {"MCP-Protocol-Version": SUPPORTED_PROTOCOL_VERSIONS[0], "Accept": "text/event-stream"}
 
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            async with client.stream("GET", f"http://{host}:{port}/mcp", headers=headers) as response:
-                assert response.status_code == 200
+        async with httpx.AsyncClient(timeout=2.0) as client, client.stream(
+            "GET", f"http://{host}:{port}/mcp", headers=headers
+        ) as response:
+            assert response.status_code == HTTP_OK
 
         tg.cancel_scope.cancel()
         await anyio.sleep(0)
@@ -164,12 +170,13 @@ async def test_streamable_http_preinitialize_get_requires_session(unused_tcp_por
 
         async with httpx.AsyncClient(timeout=2.0) as client:
             response = await client.get(f"http://{host}:{port}/mcp", headers=headers)
-            assert response.status_code == 400
+            assert response.status_code == HTTP_BAD_REQUEST
             payload = response.json()
             error = payload.get("error", {})
-            assert error.get("code") == -32600
+            assert error.get("code") == JSONRPC_INVALID_REQUEST
             message = error.get("message", "").lower()
-            assert "missing" in message and "session" in message
+            assert "missing" in message
+            assert "session" in message
 
         tg.cancel_scope.cancel()
         await anyio.sleep(0)

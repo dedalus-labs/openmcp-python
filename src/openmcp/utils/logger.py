@@ -4,6 +4,8 @@
 #               github.com/dedalus-labs/openmcp-python/LICENSE
 # ==============================================================================
 
+# TODO: structlog or keep lightweight?
+
 """Logging utilities for OpenMCP.
 
 This mirrors the richer logger used in ``api-final`` while keeping the surface

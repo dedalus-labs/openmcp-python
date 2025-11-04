@@ -10,11 +10,12 @@ The utilities in this module provide a stable surface over the reference
 SDK's ``request_ctx`` primitive so application code can access
 capabilities such as logging and progress without importing SDK internals.
 
-Spec receipts referenced throughout the implementation:
+Implements context integration for MCP capabilities:
 
-* ``docs/mcp/capabilities/logging/index.md``
-* ``docs/mcp/core/progress/index.md``
-* ``docs/mcp/spec/schema-reference/notifications-progress.md``
+- https://modelcontextprotocol.io/specification/2025-06-18/server/logging
+  (server-to-client logging notifications)
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress
+  (progress notifications during long-running operations)
 """
 
 from __future__ import annotations
@@ -100,7 +101,8 @@ class Context:
         return None if meta is None else getattr(meta, "progressToken", None)
 
     # ------------------------------------------------------------------
-    # Logging conveniences (docs/mcp/capabilities/logging/index.md)
+    # Logging conveniences
+    # See: https://modelcontextprotocol.io/specification/2025-06-18/server/logging
     # ------------------------------------------------------------------
 
     async def log(
@@ -138,7 +140,8 @@ class Context:
         await self.log("error", message, logger=logger, data=data)
 
     # ------------------------------------------------------------------
-    # Progress helpers (docs/mcp/core/progress/index.md)
+    # Progress helpers
+    # See: https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress
     # ------------------------------------------------------------------
 
     async def report_progress(self, progress: float, *, total: float | None = None, message: str | None = None) -> None:

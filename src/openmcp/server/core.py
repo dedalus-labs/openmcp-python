@@ -48,7 +48,7 @@ from .services import (
     ToolsService,
 )
 from .subscriptions import SubscriptionManager
-from .transports import StdioTransport, StreamableHTTPTransport
+from .transports import ASGIRunConfig, StdioTransport, StreamableHTTPTransport
 from ..completion import CompletionSpec
 from ..completion import reset_active_server as reset_completion_server
 from ..completion import set_active_server as set_completion_server
@@ -251,7 +251,10 @@ class MCPServer(Server[Any, Any]):
         return self.ping.active()
 
     async def ping_client(self, session: ServerSession, *, timeout: float | None = None) -> bool:
-        """Send ``ping`` to a specific client session (docs/mcp/spec/schema-reference/ping.md)."""
+        """Send ``ping`` to a specific client session.
+
+        See: https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/ping
+        """
         return await self.ping.ping(session, timeout=timeout)
 
     async def ping_clients(
@@ -335,11 +338,17 @@ class MCPServer(Server[Any, Any]):
         return await self.completions.execute(ref, argument, context)
 
     async def request_sampling(self, params: types.CreateMessageRequestParams) -> types.CreateMessageResult:
-        """Proxy ``sampling/createMessage`` (docs/mcp/spec/schema-reference/sampling-createmessage.md)."""
+        """Proxy ``sampling/createMessage`` request to client.
+
+        See: https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+        """
         return await self.sampling.create_message(params)
 
     async def request_elicitation(self, params: types.ElicitRequestParams) -> types.ElicitResult:
-        """Proxy ``elicitation/create`` (docs/mcp/spec/schema-reference/elicitation-create.md)."""
+        """Proxy ``elicitation/create`` request to client.
+
+        See: https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation
+        """
         return await self.elicitation.create(params)
 
     async def list_resource_templates_paginated(self, cursor: str | None = None) -> types.ListResourceTemplatesResult:
@@ -551,7 +560,14 @@ class MCPServer(Server[Any, Any]):
         **uvicorn_options: Any,
     ) -> None:
         transport = self._transport_for_name("streamable-http")
-        await transport.run(host=host, port=port, path=path, log_level=log_level, **uvicorn_options)
+        run_config = ASGIRunConfig(
+            host=host,
+            port=port,
+            path=path,
+            log_level=log_level,
+            uvicorn_options=dict(uvicorn_options),
+        )
+        await transport.run(config=run_config)
 
     # //////////////////////////////////////////////////////////////////
     # Internal helpers

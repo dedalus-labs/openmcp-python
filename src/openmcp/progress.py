@@ -6,11 +6,10 @@
 
 """Progress utilities for emitting MCP-compliant telemetry.
 
-This module implements a coalescing progress tracker that honours the
-Model Context Protocol progress semantics defined in
-``docs/mcp/core/progress/progress-flow.md`` and the
-``notifications/progress`` schema in
-``docs/mcp/spec/schema-reference/notifications-progress.md``.
+Implements progress notifications as specified in the Model Context Protocol:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress
+  (progress notification semantics, token requirements, progress flow)
 
 Compared to the reference SDK helper, this implementation adds:
 
@@ -30,7 +29,7 @@ Usage::
 
 Handlers must only call :func:`progress` when the inbound request included a
 ``_meta.progressToken``. The helper raises :class:`ValueError` when the token is
-absent, matching the requirements in ``docs/mcp/core/progress/progress-flow.md``.
+absent per the MCP specification.
 """
 
 from __future__ import annotations
@@ -323,7 +322,8 @@ class _ProgressEmitter:
         previous = self._latest or self._last_emitted
         if previous and progress < previous.progress:
             raise ValueError(
-                "progress must be monotonically increasing as required by docs/mcp/core/progress/progress-flow.md"
+                "progress must be monotonically increasing per MCP specification "
+                "(https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress)"
             )
         total = (
             total_override
@@ -484,7 +484,8 @@ def _resolve_request_context() -> RequestContext[BaseSession[Any, Any, Any, Any,
         raise RuntimeError("progress() requires an active request context") from exc
     if ctx.meta is None or ctx.meta.progressToken is None:
         raise ValueError(
-            "progress() requires the caller to supply _meta.progressToken per docs/mcp/core/progress/progress-flow.md"
+            "progress() requires the caller to supply _meta.progressToken per MCP specification "
+            "(https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress)"
         )
     return ctx
 

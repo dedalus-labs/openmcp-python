@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 
 if TYPE_CHECKING:
-    from ..app import MCPServer
+    from ..core import MCPServer
 
 
 class BaseTransport(ABC):

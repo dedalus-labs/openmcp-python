@@ -6,29 +6,32 @@ root management, cancellation, and the groundwork for authorization.
 ## Creating a Client
 
 ```python
-from openmcp import MCPClient
-from openmcp.client import transports
 from openmcp import types
+from openmcp.client import ClientCapabilitiesConfig, open_connection
 
-async with transports.streamable_http_client("https://localhost:8000/mcp") as (reader, writer, get_session_id):
-    async with MCPClient(
-        reader,
-        writer,
-        capabilities=ClientCapabilitiesConfig(
-            enable_roots=True,
-            initial_roots=[{"uri": "file:///workspace"}],
-            sampling=my_sampling_handler,
-            elicitation=my_elicitation_handler,
-            logging=my_logging_handler,
-        ),
-        client_info=types.Implementation(name="demo-client", version="0.1.0"),
-    ) as client:
-        await client.ping()
-        tools = await client.send_request(
-            types.ClientRequest(types.ListToolsRequest()),
-            types.ListToolsResult,
-        )
+async with open_connection(
+    "https://localhost:8000/mcp",
+    transport="streamable-http",
+    capabilities=ClientCapabilitiesConfig(
+        enable_roots=True,
+        initial_roots=[{"uri": "file:///workspace"}],
+        sampling=my_sampling_handler,
+        elicitation=my_elicitation_handler,
+        logging=my_logging_handler,
+    ),
+    client_info=types.Implementation(name="demo-client", version="0.1.0"),
+) as client:
+    await client.ping()
+    tools = await client.send_request(
+        types.ClientRequest(types.ListToolsRequest()),
+        types.ListToolsResult,
+    )
 ```
+
+`open_connection()` wraps transport selection plus `MCPClient` construction into one `async with`
+block. The name intentionally mirrors `asyncio.open_connection()` and `httpx.AsyncClient`’s
+`aclose()` semantics so asynchronous Python developers recognize the pattern without extra
+learning.[^open-connection-naming]
 
 ### Capability Configuration
 
@@ -78,6 +81,9 @@ if scope.cancel_called:
 | `transports.lambda_http_client(url)` | Provides short-lived POST-only helper (no GET/SSE). |
 
 Each helper returns `(reader, writer, get_session_id)` so `MCPClient` can be constructed easily.
+
+[^open-connection-naming]: The helper mirrors established async APIs such as `asyncio.open_connection()`,
+signalling that the call opens a live connection that should be managed via the surrounding context manager.
 
 ### Authorization Hooks (Preview)
 

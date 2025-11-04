@@ -6,9 +6,12 @@
 
 """Elicitation capability adapter.
 
-Spec receipts:
-- docs/mcp/capabilities/elicitation/index.md
-- docs/mcp/spec/schema-reference/elicitation-create.md
+Implements the elicitation capability as specified in the Model Context Protocol:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation
+  (elicitation capability, create request for user input prompts)
+
+Provides adapter interface for servers to request user input from clients.
 """
 
 from __future__ import annotations

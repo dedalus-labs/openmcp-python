@@ -6,10 +6,12 @@
 
 """Sampling capability adapter for MCP servers.
 
-Spec receipts:
-- docs/mcp/capabilities/sampling/index.md
-- docs/mcp/spec/schema-reference/sampling-createmessage.md
-- docs/mcp/capabilities/sampling/error-handling.md
+Implements the sampling capability as specified in the Model Context Protocol:
+
+- https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+  (sampling capability, createMessage request for LLM interaction)
+
+Provides adapter interface for servers to handle client LLM sampling requests.
 """
 
 from __future__ import annotations
@@ -40,7 +42,10 @@ class _SessionState:
 
 
 class SamplingService:
-    """Proxy for ``sampling/createMessage`` requests (docs/mcp/spec/schema-reference/sampling-createmessage.md)."""
+    """Proxy for ``sampling/createMessage`` requests.
+
+    See: https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+    """
 
     def __init__(self, *, timeout: float = DEFAULT_TIMEOUT, max_concurrent: int = MAX_CONCURRENT) -> None:
         self._timeout = timeout
