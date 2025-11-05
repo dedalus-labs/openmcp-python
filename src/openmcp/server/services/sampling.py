@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
+import weakref
 
 import anyio
 from mcp.server.lowlevel.server import request_ctx
@@ -26,6 +27,9 @@ from mcp.shared.exceptions import McpError
 
 from ... import types
 from ...utils import get_logger
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.session import ServerSession
 
 
 DEFAULT_TIMEOUT = 60.0
@@ -39,6 +43,7 @@ class _SessionState:
     semaphore: asyncio.Semaphore
     consecutive_failures: int = 0
     cooldown_until: float = 0.0
+    request_counter: int = 0
 
 
 class SamplingService:
@@ -50,7 +55,8 @@ class SamplingService:
     def __init__(self, *, timeout: float = DEFAULT_TIMEOUT, max_concurrent: int = MAX_CONCURRENT) -> None:
         self._timeout = timeout
         self._max_concurrent = max(1, max_concurrent)
-        self._states: dict[Any, _SessionState] = {}
+        # Sessions are kept alive by the SDK; WeakKeyDictionary auto-cleans when sessions are garbage collected
+        self._states: weakref.WeakKeyDictionary[ServerSession, _SessionState] = weakref.WeakKeyDictionary()
         self._logger = get_logger("openmcp.sampling")
 
     async def create_message(self, params: types.CreateMessageRequestParams) -> types.CreateMessageResult:
@@ -66,11 +72,10 @@ class SamplingService:
         state = self._states.setdefault(session, _SessionState(asyncio.Semaphore(self._max_concurrent)))
         async with state.semaphore:
             await self._enforce_cooldown(state)
+            state.request_counter += 1
             metadata = (params.metadata or {}).copy()  # type: ignore[attr-defined]
             if "requestId" not in metadata:
-                metadata["requestId"] = (
-                    f"sampling-{id(self)}-{state.semaphore._value}"  # pragma: no cover - best effort
-                )
+                metadata["requestId"] = f"sampling-{id(self)}-{state.request_counter}"
             params.metadata = metadata  # type: ignore[attr-defined]
 
             try:

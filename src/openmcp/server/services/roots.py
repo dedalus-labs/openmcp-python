@@ -28,6 +28,8 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import anyio
 from urllib.parse import unquote, urlparse
 import weakref
 
@@ -160,7 +162,7 @@ class RootsService:
 
         async def _run() -> None:
             try:
-                await asyncio.sleep(self._debounce_delay)
+                await anyio.sleep(self._debounce_delay)
                 await self.refresh(session)
             except asyncio.CancelledError:  # pragma: no cover - debounce cancellation expected
                 pass

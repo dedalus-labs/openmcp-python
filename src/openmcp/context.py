@@ -209,9 +209,18 @@ def _reset_context(token: Token[Context | None]) -> None:
 
 
 @contextmanager
-def context_scope() -> Iterator[Context]:
-    """Context manager that activates the current request context."""
-    token = _activate_request_context()
+def context_scope() -> Iterator[Context | None]:
+    """Context manager that activates the current request context.
+
+    Yields None if no request context is available (e.g., during testing).
+    """
+    try:
+        token = _activate_request_context()
+    except LookupError:
+        # No request context available (e.g., direct service method calls in tests)
+        yield None
+        return
+
     try:
         yield get_context()
     finally:

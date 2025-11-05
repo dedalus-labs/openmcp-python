@@ -17,7 +17,8 @@ Provides adapter interface for servers to request user input from clients.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+import weakref
 
 import anyio
 from mcp.server.lowlevel.server import request_ctx
@@ -25,6 +26,9 @@ from mcp.shared.exceptions import McpError
 
 from ... import types
 from ...utils import get_logger
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.session import ServerSession
 
 
 DEFAULT_TIMEOUT = 60.0
@@ -40,7 +44,8 @@ class ElicitationService:
 
     def __init__(self, *, timeout: float = DEFAULT_TIMEOUT) -> None:
         self._timeout = timeout
-        self._states: dict[Any, _SessionState] = {}
+        # Sessions are kept alive by the SDK; WeakKeyDictionary auto-cleans when sessions are garbage collected
+        self._states: weakref.WeakKeyDictionary[ServerSession, _SessionState] = weakref.WeakKeyDictionary()
         self._logger = get_logger("openmcp.elicitation")
 
     async def create(self, params: types.ElicitRequestParams) -> types.ElicitResult:

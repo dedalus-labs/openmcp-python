@@ -23,13 +23,9 @@ from dataclasses import asdict, is_dataclass
 import json
 from typing import Any
 
+from pydantic import BaseModel
+
 from .. import types
-
-
-try:  # pragma: no cover - optional import when pydantic is present
-    from pydantic import BaseModel
-except Exception:  # pragma: no cover - fall back if the import path changes
-    BaseModel = None
 
 __all__ = ["normalize_tool_result", "normalize_resource_payload"]
 
@@ -55,12 +51,13 @@ def normalize_tool_result(value: Any) -> types.CallToolResult:
     ):
         try:
             return types.CallToolResult(**value)
-        except Exception:  # pragma: no cover - defensive; fallback to generic path
+        except (TypeError, ValueError):  # pragma: no cover - defensive; fallback to generic path
+            # Invalid kwargs for CallToolResult; treat as generic dict
             pass
 
     if is_dataclass(value):
         value = asdict(value)
-    elif BaseModel and isinstance(value, BaseModel) and not isinstance(value, _CONTENT_CLASSES):
+    elif isinstance(value, BaseModel) and not isinstance(value, _CONTENT_CLASSES):
         value = value.model_dump(mode="json")
 
     structured: Any | None = None
@@ -89,7 +86,7 @@ def _coerce_content_blocks(source: Any) -> list[types.ContentBlock]:
 
     if is_dataclass(source):
         source = asdict(source)
-    elif BaseModel and isinstance(source, BaseModel) and not isinstance(source, _CONTENT_CLASSES):
+    elif isinstance(source, BaseModel) and not isinstance(source, _CONTENT_CLASSES):
         source = source.model_dump(mode="json")
 
     if isinstance(source, types.ContentBlock):
@@ -153,7 +150,7 @@ def normalize_resource_payload(uri: str, declared_mime: str | None, payload: Any
 
     if is_dataclass(payload):
         payload = asdict(payload)
-    elif BaseModel and isinstance(payload, BaseModel) and not isinstance(payload, _CONTENT_CLASSES):
+    elif isinstance(payload, BaseModel) and not isinstance(payload, _CONTENT_CLASSES):
         payload = payload.model_dump(mode="json")
 
     if isinstance(payload, dict):
@@ -201,7 +198,7 @@ def _jsonify(value: Any, _depth: int = 0) -> Any:
 
     if is_dataclass(value):
         value = asdict(value)
-    elif BaseModel and isinstance(value, BaseModel) and not isinstance(value, _CONTENT_CLASSES):
+    elif isinstance(value, BaseModel) and not isinstance(value, _CONTENT_CLASSES):
         value = value.model_dump(mode="json")
 
     if isinstance(value, (str, int, float, bool)) or value is None:

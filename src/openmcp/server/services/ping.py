@@ -56,6 +56,7 @@ class PingService:
         self.notification_sink = notification_sink
         self._logger = logger
         self._sessions: weakref.WeakSet[ServerSession] = weakref.WeakSet()
+        # Sessions are kept alive by the SDK; WeakKeyDictionary auto-cleans when sessions are garbage collected
         self._states: weakref.WeakKeyDictionary[ServerSession, _SessionState] = weakref.WeakKeyDictionary()
         self._ewma_alpha = ewma_alpha
         self._history_size = history_size

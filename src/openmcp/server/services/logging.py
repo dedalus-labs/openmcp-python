@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import weakref
 
 import anyio
@@ -29,6 +29,9 @@ from mcp.shared.exceptions import McpError
 
 from ..notifications import NotificationSink
 from ... import types
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from mcp.server.session import ServerSession
 
 
 _LOGGING_LEVEL_MAP = {
@@ -48,7 +51,8 @@ class LoggingService:
         self._logger = logger
         self._sink = notification_sink
         self._lock = anyio.Lock()
-        self._session_levels: weakref.WeakKeyDictionary[Any, int] = weakref.WeakKeyDictionary()
+        # Sessions are kept alive by the SDK; WeakKeyDictionary auto-cleans when sessions are garbage collected
+        self._session_levels: weakref.WeakKeyDictionary[ServerSession, int] = weakref.WeakKeyDictionary()
         self._handler = _NotificationHandler(self)
         self._install_handler()
 
@@ -121,13 +125,15 @@ class LoggingService:
         params = types.LoggingMessageNotificationParams(level=level, logger=logger_name, data=data)
         notification = types.ServerNotification(types.LoggingMessageNotification(params=params))
 
-        stale: list[Any] = []
+        stale: list[ServerSession] = []
         for session, threshold in targets:
             if numeric_level < threshold:
                 continue
             try:
                 await self._sink.send_notification(session, notification)
-            except Exception:  # pragma: no cover - defensive cleanup
+            except Exception as exc:  # pragma: no cover - defensive cleanup
+                # Log but don't raise; the application should continue running
+                self._logger.debug("Failed to send log notification to session: %s", exc)
                 stale.append(session)
 
         if not stale:

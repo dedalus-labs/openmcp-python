@@ -165,8 +165,12 @@ class PromptsService:
                 if isinstance(resource_payload, dict):
                     try:
                         resource = types.TextResourceContents(**resource_payload)
-                    except Exception:
-                        resource = types.BlobResourceContents(**resource_payload)
+                    except (TypeError, ValueError):
+                        # TextResourceContents validation failed; try BlobResourceContents
+                        try:
+                            resource = types.BlobResourceContents(**resource_payload)
+                        except (TypeError, ValueError) as exc:
+                            raise TypeError(f"Invalid embedded resource payload: {exc}") from exc
                 else:
                     raise TypeError("Embedded resource requires mapping payload.")
                 return types.EmbeddedResource(type="resource", resource=resource)
