@@ -12,7 +12,7 @@ the framework primitives that host applications are expected to import.
 
 from __future__ import annotations
 
-from .core import MCPServer, NotificationFlags, TransportLiteral
+from .core import MCPServer, NotificationFlags, ServerValidationError, TransportLiteral
 
 
-__all__ = ["MCPServer", "NotificationFlags", "TransportLiteral"]
+__all__ = ["MCPServer", "NotificationFlags", "ServerValidationError", "TransportLiteral"]

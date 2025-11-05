@@ -79,10 +79,12 @@ class MCPClient:
         *,
         capabilities: ClientCapabilitiesConfig | None = None,
         client_info: types.Implementation | None = None,
+        get_session_id: Callable[[], str | None] | None = None,
     ) -> None:
         self._read_stream = read_stream
         self._write_stream = write_stream
         self._client_info = client_info
+        self._get_session_id = get_session_id
 
         self._config = capabilities or ClientCapabilitiesConfig()
         self._supports_roots = self._config.enable_roots or self._config.initial_roots is not None
@@ -131,6 +133,18 @@ class MCPClient:
         if self._session is None:
             raise RuntimeError("Client session not started; use 'async with' before accessing it.")
         return self._session
+
+    @property
+    def session_id(self) -> str | None:
+        """Return the Mcp-Session-Id assigned by the server.
+
+        Returns None if no session ID was assigned or before initialization.
+
+        See more: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#session-management
+        """
+        if self._get_session_id is None:
+            return None
+        return self._get_session_id()
 
     @property
     def supports_roots(self) -> bool:

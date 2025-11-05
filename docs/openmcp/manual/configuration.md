@@ -19,6 +19,7 @@ validation rules, and behavioral notes.
 | `notification_sink` | `DefaultNotificationSink()` | Override to integrate custom notification delivery. |
 | `http_security` | DNS rebinding protection enabled | Instance of `TransportSecuritySettings`; controls allowed hosts/origins. |
 | `authorization` | `AuthorizationConfig(enabled=False)` | Opt-in authorization scaffolding. |
+| `allow_dynamic_tools` | `False` | Enables runtime mutation of tools/prompts/resources. Requires list-change notifications. |
 
 ### AuthorizationConfig
 

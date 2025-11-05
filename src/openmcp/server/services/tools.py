@@ -10,7 +10,7 @@ Implements the tools capability as specified in the Model Context Protocol:
 
 - https://modelcontextprotocol.io/specification/2025-06-18/server/tools
   (tools capability declaration, list and call operations)
-- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+- https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination
   (cursor-based pagination for tools/list)
 
 Supports ambient tool registration, argument schema inference from type hints,
@@ -26,11 +26,13 @@ from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, get_args, get_ori
 
 from pydantic import TypeAdapter
 
-from ..result_normalizers import normalize_tool_result
+from ..dependencies import Depends
+from ..dependencies.solver import resolve as resolve_dependency
 from ..notifications import NotificationSink, ObserverRegistry
 from ..pagination import paginate_sequence
+from ..result_normalizers import normalize_tool_result
 from ... import types
-from ...context import context_scope
+from ...context import Context, context_scope, get_context
 from ...tool import ToolSpec, extract_tool_spec
 from ...utils import maybe_await_with_args
 from ...utils.schema import SchemaError, resolve_output_schema
@@ -80,50 +82,73 @@ class ToolsService:
         return self._tool_defs
 
     def register(self, target: ToolSpec | Callable[..., Any]) -> ToolSpec:
-        spec = target if isinstance(target, ToolSpec) else extract_tool_spec(target)  # type: ignore[arg-type]
-        if spec is None:
-            fn = target  # type: ignore[assignment]
-            spec = ToolSpec(name=getattr(fn, "__name__", "anonymous"), fn=fn)
+        spec: ToolSpec | None
+        if isinstance(target, ToolSpec):
+            spec = target
+        else:
+            fn = target
+            spec = extract_tool_spec(fn)
+            if spec is None:
+                spec = ToolSpec(name=getattr(fn, "__name__", "anonymous"), fn=fn)
+
+        assert spec is not None  # narrow for mypy
         self._tool_specs[spec.name] = spec
+        self._server.record_tool_mutation(operation="register")
         self._refresh_tools()
         return spec
 
     def allow_tools(self, names: Iterable[str] | None) -> None:
         self._allow = set(names) if names is not None else None
+        self._server.record_tool_mutation(operation="allow_tools")
         self._refresh_tools()
 
     async def list_tools(self, request: types.ListToolsRequest | None) -> types.ListToolsResult:
-        cursor = None
-        if request is not None and request.params is not None:
-            cursor = request.params.cursor
-        tools = list(self._tool_defs.values())
-        page, next_cursor = paginate_sequence(tools, cursor, limit=self._pagination_limit)
-        self.observers.remember_current_session()
-        return types.ListToolsResult(tools=page, nextCursor=next_cursor)
+        with context_scope():
+            cursor = None
+            if request is not None and request.params is not None:
+                cursor = request.params.cursor
+
+            filtered: list[types.Tool] = []
+            for name, tool_def in self._tool_defs.items():
+                spec = self._tool_specs.get(name)
+                if spec is None:
+                    continue
+                if not await self._tool_enabled_this_request(spec):
+                    continue
+                filtered.append(tool_def)
+
+            page, next_cursor = paginate_sequence(filtered, cursor, limit=self._pagination_limit)
+            self.observers.remember_current_session()
+            return types.ListToolsResult(tools=page, nextCursor=next_cursor)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
-        spec = self._tool_specs.get(name)
-        if not spec or name not in self._tool_defs:
-            return types.CallToolResult(
-                content=[types.TextContent(type="text", text=f'Tool "{name}" is not available')], isError=True
-            )
+        with context_scope():
+            spec = self._tool_specs.get(name)
+            if not spec or name not in self._tool_defs:
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=f'Tool "{name}" is not available')], isError=True
+                )
 
-        try:
+            if not await self._tool_enabled_this_request(spec):
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=f'Tool "{name}" is temporarily unavailable')],
+                    isError=True,
+                )
+
+            call_kwargs = await self._build_call_kwargs(spec, arguments)
+
             try:
-                with context_scope():
-                    result = await maybe_await_with_args(spec.fn, **arguments)
-            except LookupError:
-                result = await maybe_await_with_args(spec.fn, **arguments)
-        except TypeError as exc:  # argument mismatch
-            return types.CallToolResult(
-                content=[types.TextContent(type="text", text=f"Invalid arguments: {exc}")], isError=True
-            )
+                result = await maybe_await_with_args(spec.fn, **call_kwargs)
+            except TypeError as exc:  # argument mismatch
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=f"Invalid arguments: {exc}")], isError=True
+                )
 
-        if isinstance(result, types.ServerResult):
-            message = "Tool returned types.ServerResult; return the nested CallToolResult instead."
-            raise TypeError(message)
+            if isinstance(result, types.ServerResult):
+                message = "Tool returned types.ServerResult; return the nested CallToolResult instead."
+                raise TypeError(message)
 
-        return normalize_tool_result(result)
+            return normalize_tool_result(result)
 
     async def notify_list_changed(self) -> None:
         notification = types.ServerNotification(types.ToolListChangedNotification(params=None))
@@ -173,9 +198,70 @@ class ToolsService:
     def _is_tool_enabled(self, spec: ToolSpec) -> bool:
         if self._allow is not None and spec.name not in self._allow:
             return False
-        if spec.enabled is None:
+        enabled = spec.enabled
+        if enabled is None:
             return True
-        return bool(spec.enabled(self._server))
+        if isinstance(enabled, Depends):
+            return True
+        return bool(enabled(self._server))
+
+    async def _tool_enabled_this_request(self, spec: ToolSpec) -> bool:
+        enabled = spec.enabled
+        if enabled is None:
+            return True
+        if isinstance(enabled, Depends):
+            result = await resolve_dependency(enabled)
+            return bool(result)
+        return bool(await maybe_await_with_args(enabled, self._server))
+
+    async def _build_call_kwargs(self, spec: ToolSpec, arguments: dict[str, Any]) -> dict[str, Any]:
+        kwargs = dict(arguments)
+        signature = inspect.signature(spec.fn)
+
+        for name, param in signature.parameters.items():
+            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                continue
+            if name in kwargs:
+                continue
+
+            dependency = None
+
+            if isinstance(param.default, Depends):
+                dependency = param.default
+            elif isinstance(param.annotation, Depends):  # pragma: no cover - defensive
+                dependency = param.annotation  # type: ignore[assignment]
+
+            if dependency is not None:
+                kwargs[name] = await resolve_dependency(dependency)
+                continue
+
+            if self._annotation_requires_context(param.annotation):
+                try:
+                    kwargs[name] = get_context()
+                except LookupError:
+                    raise TypeError(
+                        f"Cannot inject context for parameter '{name}' outside of an MCP request"
+                    ) from None
+                continue
+
+            if param.default is not inspect.Parameter.empty:
+                kwargs[name] = param.default
+                continue
+
+            raise TypeError(f"Missing required argument '{name}' for tool '{spec.name}'")
+
+        return kwargs
+
+    @staticmethod
+    def _annotation_requires_context(annotation: Any) -> bool:
+        if annotation is inspect.Parameter.empty:
+            return False
+        if annotation is Context:
+            return True
+        origin = get_origin(annotation)
+        if origin:
+            return any(ToolsService._annotation_requires_context(arg) for arg in get_args(annotation))
+        return False
 
     def _build_input_schema(self, fn: Callable[..., Any]) -> dict[str, Any]:
         signature = inspect.signature(fn)

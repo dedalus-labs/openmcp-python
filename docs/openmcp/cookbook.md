@@ -29,6 +29,36 @@ def search(query: str, category: Literal["web", "images"] = "web", limit: int = 
     return {"query": query, "category": category, "limit": limit}
 ```
 
+### Sync vs Async Tools
+```python
+# Sync: pure computation, validation, fast operations (<1ms)
+# Use when: no I/O, CPU-bound, deterministic, instant execution
+@tool(description="Validate email format")
+def validate_email(email: str) -> dict[str, bool]:
+    return {"valid": "@" in email and "." in email.split("@")[-1]}
+
+@tool(description="Calculate checksum")
+def checksum(data: str) -> str:
+    return f"sha256:{hash(data) & 0xFFFFFFFF:08x}"
+
+# Async: I/O, network, database, long operations (>100ms)
+# Use when: network requests, file I/O, database queries, subprocess calls
+@tool(description="Fetch from API")
+async def fetch_weather(city: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"https://api.example.com/weather/{city}")
+        return response.json()
+
+@tool(description="Database query")
+async def query_user(user_id: int) -> dict:
+    async with db_pool.acquire() as conn:
+        return await conn.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
+
+# Framework inspects callables at invocation and awaits only if necessary
+# Implementation: utils.maybe_await_with_args checks inspect.isawaitable
+# No performance penalty for sync tools - called directly, not wrapped
+```
+
 ### Allow-Lists
 ```python
 from openmcp import allow_tools
@@ -41,6 +71,68 @@ with server.binding():
     def search() -> str: ...
 
 allow_tools(server, ["search"])
+```
+
+### Plan-tier gating with Depends
+```python
+from openmcp import MCPServer, Depends, tool
+
+server = MCPServer("plans")
+USERS = {"bob": {"tier": "basic"}, "alice": {"tier": "pro"}}
+
+
+def get_current_user(user_id: str) -> dict[str, str]:
+    return USERS[user_id]
+
+
+def require_pro(user: dict[str, str]) -> bool:
+    return user["tier"] == "pro"
+
+
+with server.binding():
+
+    @tool(enabled=Depends(require_pro, get_current_user))
+    async def premium_feature(user_id: str = "bob") -> str:
+        if not require_pro(get_current_user(user_id)):
+            raise PermissionError("upgrade required")
+        return "secret sauce"
+```
+
+### Dynamic tools (feature flag)
+```python
+from openmcp import MCPServer, tool
+
+server = MCPServer("feature-flagged", allow_dynamic_tools=True)
+flag_enabled = False
+
+
+def bootstrap() -> MCPServer:
+    with server.binding():
+
+        @tool(description="Ping")
+        def ping() -> str:
+            return "pong"
+
+    return server
+
+
+async def set_feature(enabled: bool) -> None:
+    global flag_enabled
+    flag_enabled = enabled
+
+    with server.binding():
+
+        @tool(description="Ping")
+        def ping() -> str:
+            return "pong"
+
+        if flag_enabled:
+
+            @tool(description="Experimental search")
+            async def search(query: str) -> str:
+                return f"results for {query}"
+
+    await server.notify_tools_list_changed()
 ```
 
 ## Resources
@@ -317,6 +409,46 @@ async def test_tool():
 
     mock_ctx = AsyncMock()
 ```
+
+## Sync vs Async: When to Use Each
+
+OpenMCP handles both synchronous and asynchronous tool functions transparently via `utils.maybe_await_with_args`. The framework inspects callables at invocation time and awaits only when necessary.
+
+**Implementation**: See `src/openmcp/utils/coro.py` for the `maybe_await_with_args` utility that enables this pattern. During tool invocation (`services/tools.py:call_tool`), the framework calls the tool function and checks if the result is awaitable using `inspect.isawaitable`.
+
+**Performance**: Synchronous tools have no async overhead—they execute directly. No wrapper, no extra coroutine frame.
+
+### Use Synchronous Tools When:
+- Pure computation (math, string operations, data transforms)
+- Input validation (schema checks, format validation)
+- No I/O operations (network, disk, database)
+- Execution time < 1ms
+- Deterministic, side-effect-free operations
+
+### Use Asynchronous Tools When:
+- Network requests (HTTP clients, gRPC, websockets)
+- Database queries (asyncpg, motor, asyncio-compatible drivers)
+- File I/O on large files (aiofiles for reading logs, processing data)
+- Subprocess calls (asyncio.create_subprocess_exec)
+- Long-running operations (>100ms)
+- Need to yield control during waits for better concurrency
+
+### Mixed Patterns:
+```python
+# Hybrid: sync preprocessing + async I/O
+@tool
+async def process_and_save(data: str) -> dict:
+    # Sync validation (instant)
+    normalized = data.strip().upper()
+    if not normalized:
+        raise ValueError("Empty data")
+
+    # Async storage (yields control)
+    await db.store(normalized)
+    return {"status": "saved", "bytes": len(normalized)}
+```
+
+**Full example**: `examples/tools/mixed_sync_async.py` demonstrates sync and async tools side-by-side with detailed timing comparisons and best practices.
 
 ## References
 

@@ -13,7 +13,7 @@ Demonstrates client handling of `sampling/createMessage` requests from servers. 
 - Model preference negotiation
 - Error handling without crashing the connection
 
-**Spec**: https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+**Spec**: https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
 
 ### elicitation_handler.py (138 LOC)
 Demonstrates client handling of `elicitation/create` requests from servers. Uses CLI prompts to collect user input matching a JSON schema.
@@ -24,7 +24,7 @@ Demonstrates client handling of `elicitation/create` requests from servers. Uses
 - Three-way actions (accept, decline, cancel)
 - Required vs optional field handling
 
-**Spec**: https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation
+**Spec**: https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation
 
 ### roots_config.py (95 LOC)
 Demonstrates client advertising filesystem roots to establish security boundaries. Shows both initial configuration and dynamic updates.

@@ -10,7 +10,7 @@ Implements the roots capability as specified in the Model Context Protocol:
 
 - https://modelcontextprotocol.io/specification/2025-06-18/client/roots
   (client-advertised filesystem roots with list-changed notifications)
-- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+- https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination
   (cursor-based pagination for roots/list)
 
 Implements cache-aside pattern where each session maintains immutable snapshots
@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 import weakref
 
-import orjson as oj
+import json
 
 
 if os.name == "nt":  # pragma: no cover - Windows specific
@@ -197,8 +197,8 @@ class RootsService:
     def encode_cursor(self, session: ServerSession, offset: int) -> str:
         entry = self._entries.get(session)
         version = entry.version if entry else 0
-        data = oj.dumps({"v": version, "o": offset})
-        return base64.urlsafe_b64encode(data).decode()
+        payload = json.dumps({"v": version, "o": offset}, separators=(",", ":")).encode()
+        return base64.urlsafe_b64encode(payload).decode()
 
     def decode_cursor(self, session: ServerSession, cursor: str | None) -> tuple[int, int]:
         entry = self._entries.get(session)
@@ -207,8 +207,8 @@ class RootsService:
             return expected_version, 0
 
         try:
-            payload = base64.urlsafe_b64decode(cursor.encode())
-            parsed = oj.loads(payload.decode())
+            raw = base64.urlsafe_b64decode(cursor.encode())
+            parsed = json.loads(raw.decode())
             version = int(parsed["v"])
             offset = int(parsed["o"])
         except Exception as exc:  # pragma: no cover - defensive

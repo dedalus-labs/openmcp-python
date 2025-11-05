@@ -41,11 +41,24 @@
 2. **Documentation update**
    - Author a "Server invariants" section describing the non-negotiable guarantees and how to run `validate()` manually.
 
+## Phase 4 – Logging Minimalism
+
+1. **Minimal runtime dependencies**
+   - Replace `openmcp.utils.logger` Rich/orjson setup with a stdlib-only configuration helper.
+   - Allow optional JSON mode via a user-supplied serializer callback so downstream apps can opt into `orjson` (document the pattern without bundling it).
+
+2. **Documentation & examples**
+   - Update logging docs to explain the minimalist philosophy and how to integrate custom logging stacks.
+   - Add an example demonstrating how to wire OpenMCP logging to an application-defined serializer (e.g., using `orjson`).
+
+3. **Validation**
+   - Ensure `tests/test_logging.py` continues to pass and cover the new helper behaviour.
+
 ## Completion Criteria
 
 - `MCPServer.validate()` implemented and invoked from default serve paths.
 - Service protocols defined and used for runtime checks.
 - New tests cover failure cases for removed/misaligned services and success cases for default stack.
+- Logging helper is stdlib-only by default, with documented extension points.
 - Release notes/docs updated to explain the validation story.
 - No regressions across existing test suite.
-

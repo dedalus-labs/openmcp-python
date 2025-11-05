@@ -10,7 +10,7 @@ from openmcp import types
 from openmcp.client import ClientCapabilitiesConfig, open_connection
 
 async with open_connection(
-    "https://localhost:8000/mcp",
+    url="https://localhost:8000/mcp",
     transport="streamable-http",
     capabilities=ClientCapabilitiesConfig(
         enable_roots=True,
@@ -45,6 +45,22 @@ learning.[^open-connection-naming]
 
 Handlers receive the raw MCP models (`types.CreateMessageRequestParams`, etc.). Return the matching
 result models (`types.CreateMessageResult`, `types.ElicitResult`).
+
+### Runtime capability mutations
+
+OpenMCP clients must treat capability lists as live data. When the server emits
+`notifications/tools/list_changed` (or the equivalent for prompts/resources), re-fetch the
+definitions and update any allow-lists or cached schemas:
+
+```python
+async for notice in client.notifications():
+    if notice.method == "notifications/tools/list_changed":
+        latest = await client.list_tools()
+        # Rebuild UI, refresh allow-lists, etc.
+```
+
+Ignoring these notifications means invoking tools that may no longer exist. Dynamic servers are
+required to notify; clients are responsible for reacting.
 
 ### Roots API
 

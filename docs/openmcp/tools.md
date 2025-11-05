@@ -26,9 +26,38 @@ with server.binding():
 server.allow_tools(["add"])  # shout stays registered but hidden
 ```
 
+### Dependency-driven allow-lists
+
+```python
+from openmcp import MCPServer, Depends, get_context, tool
+
+server = MCPServer("plans")
+USERS = {"bob": {"tier": "basic"}, "alice": {"tier": "pro"}}
+
+
+def get_current_user(user_id: str) -> dict[str, str]:
+    return USERS[user_id]
+
+
+def require_pro(user: dict[str, str]) -> bool:
+    return user["tier"] == "pro"
+
+
+with server.binding():
+
+    @tool(description="Premium forecast", enabled=Depends(require_pro, get_current_user))
+    async def premium(days: int = 7, ctx=Depends(get_context)) -> dict[str, str | int]:
+        await ctx.info("running premium forecast", data={"days": days})
+        return {"plan": "pro", "days": days}
+```
+
 - Spec receipts: `docs/mcp/spec/schema-reference/tools-list.md`, `tools-call.md`
 - Input schema inference leans on `pydantic.TypeAdapter`; unsupported annotations fall back to permissive schemas.
 - Return annotations automatically generate `outputSchema` metadata (non-object outputs are wrapped as `{ "result": ... }`) and the runtime normalizer produces matching `structuredContent` so clients can consume structured results directly.
 - For list change notifications, toggle `NotificationFlags.tools_changed` and emit updates when your registry mutates.
 - Use `get_context()` from `docs/openmcp/context.md` to emit logs or progress
   telemetry directly from tool handlers without importing SDK internals.
+- `Depends()` supports nested dependencies and is cached per request via
+  :class:`openmcp.context.Context`. Use it to express plan tiers, feature flags,
+  or to inject request-scoped data (for example, ``ctx: Context``) without
+  exposing extra parameters to clients.

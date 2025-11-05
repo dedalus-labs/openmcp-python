@@ -13,7 +13,7 @@ build-backend = "uv_build"
 [project]
 name = "openmcp"
 version = "0.1.0a0"
-description = "The Dedalus Labs OpenMCP project"
+description = "A simple and performant Model Context Protocol framework for Python."
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [
@@ -41,9 +41,17 @@ classifiers = [
 
 dependencies = [
     "pydantic>=2.12.0",
-    "rich>=14.0.0",
-    "orjson>=3.11.0",
-    "mcp==1.19.0",
+    "mcp>=1.20.0",
+]
+
+# =============================================================================
+# OPTIONAL DEPENDENCIES
+# =============================================================================
+
+[project.optional-dependencies]
+# Performance optimizations (install with: uv add "openmcp[opt]")
+opt = [
+    "uvloop>=0.22.1; platform_system != 'Windows'",  # 2-4x faster event loop (Unix only)
 ]
 
 # =============================================================================
@@ -51,9 +59,9 @@ dependencies = [
 # =============================================================================
 
 [project.urls]
-Homepage = "https://github.com/dedalus-labs/openmcp"
-Repository = "https://github.com/dedalus-labs/openmcp"
-Issues = "https://github.com/dedalus-labs/openmcp/issues"
+Homepage = "https://github.com/dedalus-labs/openmcp-python"
+Repository = "https://github.com/dedalus-labs/openmcp-python"
+Issues = "https://github.com/dedalus-labs/openmcp-python/issues"
 
 # =============================================================================
 # PROJECT SCRIPTS
@@ -89,7 +97,19 @@ test = [
 ]
 
 # Linting and static analysis tools
-lint = ["ruff>=0.13.3", "pre-commit>=4.3.0", "ty>=0.0.1a21", "vulture>=2.14"]
+#
+# NOTE: We use mypy>=1.18.2 for now but will migrate to `ty` once it reaches GA/stable.
+#       ty is significantly faster (5-10x) but still in alpha. Migration plan:
+#       - Keep mypy as fallback until ty is production-ready
+#       - ty config already in place (tool.ty.*)
+#       - Switch when: ty hits 1.0.0 or enters beta with backwards compatibility
+lint = [
+    "ruff>=0.13.3",
+    "pre-commit>=4.3.0",
+    "mypy>=1.18.2", # Latest mypy - will migrate to ty when stable
+    "ty>=0.0.1a21", # Alpha - evaluating for future migration
+    "vulture>=2.14",
+]
 
 # Debugging tools
 debug = ["pdbpp>=0.10.3", "icecream>=2.1.8"]
@@ -125,17 +145,6 @@ preview = true           # Enable all preview features
 package = true           # Install project itself
 default-groups = ["dev"] # Include dev group by default
 
-# Exclude patterns for cleaner builds
-exclude = [
-    "dist",
-		"docs",
-    "**/__pycache__",
-    "**/build",
-    "**/.pytest_cache",
-    "**/.mypy_cache",
-    "internals",
-]
-
 # Performance optimizations
 compile-bytecode = true # 10-20% faster startup
 link-mode = "hardlink"  # Fastest cache linking (macOS/Linux)
@@ -158,15 +167,29 @@ python-preference = "managed"  # Use uv-managed Python installations
 python-downloads = "automatic" # Auto-download Python versions
 
 # Dependency constraints for version management
-[tool.uv.dependency-constraints]
-numpy = ">=1.24.0,<2.0.0" # Pin major version for stability
-scipy = ">=1.11.0,<2.0.0" # Scientific computing stability
+constraint-dependencies = [
+    "numpy>=1.24.0,<2.0.0", # Pin major version for stability
+    "scipy>=1.11.0,<2.0.0", # Scientific computing stability
+]
 
 # Source configuration for development
 [tool.uv.sources]
 # Example for local development packages
 # my-local-package = { path = "../my-local-package", editable = true }
 # experimental-feature = { git = "https://github.com/user/repo.git", branch = "experimental" }
+
+# Workspace configuration
+[tool.uv.workspace]
+# Exclude patterns for cleaner builds
+exclude = [
+    "dist",
+    "docs",
+    "**/__pycache__",
+    "**/build",
+    "**/.pytest_cache",
+    "**/.mypy_cache",
+    "internals",
+]
 
 # =============================================================================
 # RUFF CONFIGURATION - GOOGLE PYTHON STYLE GUIDE
@@ -389,6 +412,25 @@ exclude_lines = [
     "class .*\\(.*Protocol.*\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+# =============================================================================
+# MYPY CONFIGURATION - STRICT TYPE CHECKING
+# =============================================================================
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+strict_equality = true
+namespace_packages = true
 
 # =============================================================================
 # TY CONFIGURATION - ULTRA-FAST TYPE CHECKING

@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import types
+from .server.dependencies import Depends
 from .utils.schema import resolve_input_schema, resolve_output_schema
 
 
@@ -51,7 +52,7 @@ class ToolSpec:
     description: str = ""
     tags: set[str] = field(default_factory=set)
     input_schema: dict[str, Any] | None = None
-    enabled: Callable[[MCPServer], bool] | None = None
+    enabled: Callable[[MCPServer], bool] | Depends | None = None
     title: str | None = None
     output_schema: dict[str, Any] | None = None
     annotations: dict[str, Any] | None = None
@@ -90,7 +91,7 @@ def tool(
     description: str | None = None,
     tags: Iterable[str] | None = None,
     input_schema: dict[str, Any] | None = None,
-    enabled: Callable[[MCPServer], bool] | None = None,
+    enabled: Callable[[MCPServer], bool] | Depends | None = None,
     title: str | None = None,
     output_schema: dict[str, Any] | None = None,
     annotations: dict[str, Any] | None = None,

@@ -23,7 +23,7 @@ OpenMCP wraps the official MCP reference SDK with ergonomic decorators, automati
 
 **Protocol**: MCP 2025-06-18, 98% compliant. All 9 capabilities (tools, resources, prompts, completion, logging, sampling, roots, elicitation). Lifecycle: initialize → initialized → operation. Every feature cites spec clause in `docs/mcp/spec/`.
 
-**DX**: Ambient `@tool`/`@resource`/`@prompt` registration, Pydantic schema inference from type hints, allow-lists, `get_context()` for progress/logging.
+**DX**: Ambient `@tool`/`@resource`/`@prompt` registration, Pydantic schema inference from type hints, sync/async tool support (transparent via `utils.maybe_await_with_args`), allow-lists, `get_context()` for progress/logging.
 
 **Operational**: Progress coalescing, phi-accrual failure detection (adaptive vs binary alive/dead), thread-safe subscriptions (weak refs, auto-cleanup), request cancellation, schema caching.
 
@@ -87,13 +87,21 @@ asyncio.run(main())
 ```python
 from typing import Literal
 
-@tool(description="Search with category filter")
-def search(query: str, category: Literal["web", "images"] = "web") -> dict:
-    return {"results": [...], "category": category}
-# Schema auto-generated from type hints: Literal → enum, default → optional
+# Sync: pure computation, fast operations
+@tool(description="Validate email")
+def validate(email: str) -> bool:
+    return "@" in email
+
+# Async: I/O, network, database
+@tool(description="Fetch data")
+async def fetch(url: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        return (await client.get(url)).json()
+
+# Both work transparently - framework handles sync/async via utils.maybe_await_with_args
 ```
 
-`tools/list`, `tools/call`, list change notifications, allow-lists, progress tracking. [`docs/openmcp/tools.md`](docs/openmcp/tools.md) | [`examples/hello_trip/server.py`](examples/hello_trip/server.py)
+`tools/list`, `tools/call`, sync/async support, list change notifications, allow-lists, progress tracking. [`docs/openmcp/tools.md`](docs/openmcp/tools.md) | [`examples/hello_trip/server.py`](examples/hello_trip/server.py) | [`examples/tools/mixed_sync_async.py`](examples/tools/mixed_sync_async.py)
 
 ### Resources
 
@@ -226,6 +234,8 @@ OAuth 2.1 framework (RFC 9068 JWT profile), provider protocol, bearer token vali
 - [`auth_stub/`](examples/auth_stub/) - Authorization with custom provider
 - [`progress_logging.py`](examples/progress_logging.py) - Context API, progress
 - [`cancellation.py`](examples/cancellation.py) - Request cancellation
+- [`advanced/custom_logging.py`](examples/advanced/custom_logging.py) - Structured log forwarding, color customization, enterprise log sinks
+- [`advanced/feature_flag_server.py`](examples/advanced/feature_flag_server.py) - Dynamic tool registry with guardrails + feature flags
 
 Start with `hello_trip/`, then `full_demo/` for advanced patterns.
 
@@ -270,7 +280,7 @@ Covers: protocol lifecycle, registration, schema inference, subscriptions, pagin
 4. **Single responsibility**: One module per concern (e.g., `services/tools.py`)
 5. **Composable**: Injected services, swappable transports
 6. **SDK delegation**: Reuse reference SDK for JSON-RPC/transport
-7. **Dependency discipline**: Pydantic (schemas), anyio (async), starlette/uvicorn (HTTP), orjson (perf)
+7. **Dependency discipline**: Pydantic (schemas), anyio (async), starlette/uvicorn (HTTP). Optional extras (e.g., `orjson`, `rich`) stay out of the core to keep installs lean.
 
 **Extend**: Add services in `src/openmcp/server/services/`, transports via `register_transport()`, auth via `AuthorizationProvider`.
 

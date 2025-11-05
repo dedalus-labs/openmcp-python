@@ -49,7 +49,7 @@ LambdaHTTPNames = {"lambda-http", "lambda_http"}
 
 @asynccontextmanager
 async def open_connection(  # noqa: D401 - docstring inherited by module docs
-    target: str,
+    url: str,
     *,
     transport: str = "streamable-http",
     headers: Mapping[str, str] | None = None,
@@ -64,22 +64,22 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
 ) -> AsyncGenerator[MCPClient, None]:
     """Open an MCP client connection.
 
-    Parameters
-    ----------
-    target:
-        URL or transport-specific target to connect to.
-    transport:
-        Name of the transport to use (``"streamable-http"`` by default).  Alias
-        spellings like ``"shttp"`` are supported.  ``"lambda-http"`` selects the
-        POST-only helper for stateless environments.  All other transports
-        raise :class:`ValueError`.
-    headers, timeout, sse_read_timeout, terminate_on_close, httpx_client_factory, auth:
-        Passed through to the underlying transport factory.
-    capabilities, client_info:
-        Optional settings forwarded to :class:`~openmcp.client.MCPClient` for
-        capability negotiation.
-    transport_kwargs:
-        Extra keyword arguments forwarded to the underlying transport helper.
+    Args:
+        url: Fully qualified MCP endpoint (for example, ``"http://127.0.0.1:8000/mcp"``).
+        transport: Transport name. Defaults to ``"streamable-http"``; accepts aliases like
+            ``"shttp"`` and ``"lambda-http"``.
+        headers: Optional HTTP headers to merge into the Streamable HTTP or Lambda HTTP transport.
+        timeout: Total request timeout passed to the underlying transport.
+        sse_read_timeout: Streaming read timeout for Server-Sent Events.
+        terminate_on_close: Whether to send a transport-level termination request when closing.
+        httpx_client_factory: Factory used to build the HTTPX client for Streamable HTTP variants.
+        auth: Optional HTTPX authentication handler.
+        capabilities: Optional client capability configuration advertised during initialization.
+        client_info: Implementation metadata forwarded during the MCP handshake.
+        transport_kwargs: Transport-specific keyword arguments forwarded to the underlying helper.
+
+    Yields:
+        MCPClient: A negotiated MCP client ready for ``send_request`` and other operations.
     """
     selected = transport.lower()
 
@@ -93,7 +93,7 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
 
         async with (
             streamablehttp_client(
-                target,
+                url,
                 headers=base_headers,
                 timeout=timeout,
                 sse_read_timeout=sse_read_timeout,
@@ -101,8 +101,14 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
                 httpx_client_factory=httpx_client_factory,
                 auth=auth,
                 **transport_kwargs,
-            ) as (read_stream, write_stream, _),
-            MCPClient(read_stream, write_stream, capabilities=capabilities, client_info=client_info) as client,
+            ) as (read_stream, write_stream, get_session_id),
+            MCPClient(
+                read_stream,
+                write_stream,
+                capabilities=capabilities,
+                client_info=client_info,
+                get_session_id=get_session_id,
+            ) as client,
         ):
             yield client
         return
@@ -114,7 +120,7 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
 
         async with (
             lambda_http_client(
-                target,
+                url,
                 headers=base_headers,
                 timeout=timeout,
                 sse_read_timeout=sse_read_timeout,
@@ -122,8 +128,14 @@ async def open_connection(  # noqa: D401 - docstring inherited by module docs
                 httpx_client_factory=httpx_client_factory,
                 auth=auth,
                 **transport_kwargs,
-            ) as (read_stream, write_stream, _),
-            MCPClient(read_stream, write_stream, capabilities=capabilities, client_info=client_info) as client,
+            ) as (read_stream, write_stream, get_session_id),
+            MCPClient(
+                read_stream,
+                write_stream,
+                capabilities=capabilities,
+                client_info=client_info,
+                get_session_id=get_session_id,
+            ) as client,
         ):
             yield client
         return

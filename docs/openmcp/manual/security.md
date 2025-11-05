@@ -28,6 +28,12 @@ This section summarises the mitigations OpenMCP currently provides, along with T
 
 - `PingService` uses a phi-accrual failure detector and jittered scheduling to avoid correlated load.
 
+### Dynamic capability warning
+
+- Servers that run with `allow_dynamic_tools=True` can change their tool/resource/prompt sets at runtime. Clearly document this for consumers and emit `notifications/.../list_changed` immediately after each mutation.
+- Clients integrating with untrusted servers should treat capabilities as ephemeral: refresh tool definitions whenever a list-changed notification arrives and avoid blanket auto-approval of new tools.
+- For highly regulated deployments, keep `allow_dynamic_tools=False` and only enable the feature behind explicit change control.
+
 ## Planned / TODO (tracked)
 
 | Area | Status | Notes |

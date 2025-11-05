@@ -12,7 +12,7 @@ capabilities such as logging and progress without importing SDK internals.
 
 Implements context integration for MCP capabilities:
 
-- https://modelcontextprotocol.io/specification/2025-06-18/server/logging
+- https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
   (server-to-client logging notifications)
 - https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress
   (progress notifications during long-running operations)
@@ -41,6 +41,7 @@ from .progress import progress as progress_manager
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.session import ServerSession
+    from .server.dependencies.models import DependencyCall, ResolvedDependency
 
 
 _CURRENT_CONTEXT: ContextVar[Context | None] = ContextVar("openmcp_current_context", default=None)
@@ -79,6 +80,7 @@ class Context:
     """
 
     _request_context: RequestContext
+    dependency_cache: dict["DependencyCall", "ResolvedDependency"] | None = None
 
     # ------------------------------------------------------------------
     # Introspection helpers
@@ -95,6 +97,26 @@ class Context:
         return self._request_context.session
 
     @property
+    def session_id(self) -> str | None:
+        """Return the Mcp-Session-Id from the request headers.
+
+        Per the MCP specification, servers MAY assign a session ID during
+        initialization via the Mcp-Session-Id header. This property extracts
+        that session ID from subsequent requests.
+
+        Returns None for transports without session IDs (e.g., STDIO).
+
+        See more: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#session-management
+        """
+        request = getattr(self._request_context, "request", None)
+        if request is None:
+            return None
+        headers = getattr(request, "headers", None)
+        if headers is None:
+            return None
+        return headers.get("mcp-session-id")
+
+    @property
     def progress_token(self) -> ProgressToken | None:
         """Return the progress token supplied by the client, if any."""
         meta = self._request_context.meta
@@ -102,7 +124,7 @@ class Context:
 
     # ------------------------------------------------------------------
     # Logging conveniences
-    # See: https://modelcontextprotocol.io/specification/2025-06-18/server/logging
+    # See: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
     # ------------------------------------------------------------------
 
     async def log(

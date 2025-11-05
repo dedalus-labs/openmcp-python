@@ -37,7 +37,7 @@ codebase.
    - The reference MCP SDK (`references/python-sdk`) for wire-level fidelity.
    - `pydantic` TypeAdapter for JSON Schema derivation (see the spec’s schema
      section).
-   - `rich` + `orjson` for parity with the larger API project’s logging.
+   - Optional extras (e.g., `rich`, `orjson`) remain outside the core and are documented for integrators who need them.
    Resist additional dependencies unless the spec mandates them.
 
 7. **Tests as spec receipts.** Each pytest should focus on a discrete protocol

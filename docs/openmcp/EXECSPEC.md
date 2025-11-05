@@ -17,7 +17,7 @@
 - **Target LOC**: ~200-300
 - **Location**: `/docs/openmcp/sampling.md`
 - **Requirements**:
-  - Spec citation: `https://modelcontextprotocol.io/specification/2025-06-18/server/sampling`
+  - Spec citation: `https://modelcontextprotocol.io/specification/2025-06-18/client/sampling`
   - Explain `sampling/createMessage` request flow
   - When servers should request LLM completions from clients
   - Handler implementation (sync and async examples)
@@ -48,7 +48,7 @@
 - **Target LOC**: ~150-200
 - **Location**: `/docs/openmcp/elicitation.md`
 - **Requirements**:
-  - Spec citation: `https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation`
+  - Spec citation: `https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation`
   - NEW capability in MCP 2025-06-18 (note this)
   - Explain `elicitation/create` request flow
   - When servers should request user input
@@ -179,7 +179,7 @@
 - **Target LOC**: ~150-200
 - **Location**: `/docs/openmcp/pagination.md`
 - **Requirements**:
-  - Spec citation: `https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination`
+  - Spec citation: `https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination`
   - Cursor-based pagination semantics
   - Opaque cursor tokens (base64 encoded)
   - Invalid cursor → INVALID_PARAMS (-32602)

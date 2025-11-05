@@ -10,7 +10,7 @@
 
 ## Specification
 
-- **Spec Citation**: https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+- **Spec Citation**: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination
 - **Applicable Endpoints**:
   - `tools/list` → `ListToolsResult.nextCursor`
   - `resources/list` → `ListResourcesResult.nextCursor`
@@ -164,7 +164,7 @@ The pattern applies identically to `resources/list`, `prompts/list`, and `roots/
 
 ## See Also
 
-- **Specification**: https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+- **Specification**: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination
 - **Tools Capability**: `docs/openmcp/tools.md` — tool listing and invocation
 - **Resources Capability**: `docs/openmcp/resources.md` — resource listing and subscriptions
 - **Prompts Capability**: `docs/openmcp/prompts.md` — prompt listing and retrieval

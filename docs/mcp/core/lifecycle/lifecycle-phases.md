@@ -141,6 +141,10 @@ Both parties **MUST**:
 * Respect the negotiated protocol version
 * Only use capabilities that were successfully negotiated
 
+#### Runtime capability changes
+
+The protocol allows either party to mutate its advertised capabilities mid-session provided the other side is notified. Servers that add, remove, or modify tools **MUST** emit `notifications/tools/list_changed`; clients must do the same for client-exposed capabilities such as roots. Consumers should therefore treat capability lists as live contracts rather than static schemas.
+
 ### Shutdown
 
 During the shutdown phase, one side (usually the client) cleanly terminates the protocol
@@ -164,4 +168,3 @@ exiting.
 
 For HTTP [transports](/specification/2025-06-18/basic/transports), shutdown is indicated by closing the
 associated HTTP connection(s).
-

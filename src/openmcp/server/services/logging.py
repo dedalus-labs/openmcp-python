@@ -8,7 +8,7 @@
 
 Implements the logging capability as specified in the Model Context Protocol:
 
-- https://modelcontextprotocol.io/specification/2025-06-18/server/logging
+- https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
   (logging capability, setLevel request, message notifications)
 
 Bridges Python's logging system to MCP message notifications with per-session

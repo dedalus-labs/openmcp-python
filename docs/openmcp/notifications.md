@@ -17,8 +17,8 @@ This document explains the internal plumbing that powers list-changed notificati
 
 Notifications are defined in the MCP specification:
 
-- **Base**: https://modelcontextprotocol.io/specification/2025-06-18/basic/messages (notifications section)
-- **Built-in types**: https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/
+- **Base**: https://modelcontextprotocol.io/specification/2025-06-18/spec/overview/messages
+- **Built-in types**: https://modelcontextprotocol.io/specification/2025-06-18/schema-reference/notifications-message (and related schema entries)
 
 The spec requires that notifications:
 
@@ -215,7 +215,7 @@ async def _broadcast(
 
 The logging service maintains per-session log level thresholds and only sends messages that meet or exceed each session's configured level.
 
-**Spec**: https://modelcontextprotocol.io/specification/2025-06-18/server/logging
+**Spec**: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
 
 ## Stale Session Cleanup
 
@@ -362,4 +362,4 @@ If you need similar behavior for custom notifications, implement a debouncing wr
 - [Cancellation](./cancellation.md) — Cancellation notification handling
 - [Logging](../manual/logging.md) — Logging capability and message notifications
 - [Subscriptions](./subscriptions.md) — Resource update notifications
-- MCP Spec: [Notifications](https://modelcontextprotocol.io/specification/2025-06-18/basic/messages#notifications)
+- MCP Spec: [Notifications](https://modelcontextprotocol.io/specification/2025-06-18/spec/overview/messages#notifications)

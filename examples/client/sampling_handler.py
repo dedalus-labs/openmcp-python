@@ -10,7 +10,7 @@ Demonstrates how to handle sampling/createMessage requests from servers that
 need LLM completions during tool execution. This example integrates with the
 Anthropic API to provide real completions.
 
-See: https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+See: https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
 See also: docs/openmcp/sampling.md
 
 Run with:
@@ -83,7 +83,7 @@ async def main() -> None:
     )
 
     async with open_connection(
-        target=SERVER_URL,
+        url=SERVER_URL,
         transport="streamable-http",
         capabilities=capabilities,
     ) as client:

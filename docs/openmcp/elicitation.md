@@ -35,7 +35,7 @@ with server.binding():
             return "Deletion cancelled"
 ```
 
-- Spec receipt: `https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation`
+- Spec receipt: `https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation`
 - NEW in MCP 2025-06-18 (this capability did not exist in prior protocol versions)
 - Client must advertise `elicitation` capability during handshake; requests fail with `METHOD_NOT_FOUND` otherwise
 - The 60s timeout is configurable via `ElicitationService(timeout=90.0)` if you need longer user-think time
@@ -58,6 +58,8 @@ Elicitation was introduced in the 2025-06-18 protocol revision to provide a stan
 ### Protocol Messages
 
 **Request**: `elicitation/create`
+
+
 ```json
 {
   "method": "elicitation/create",
@@ -75,7 +77,9 @@ Elicitation was introduced in the 2025-06-18 protocol revision to provide a stan
 }
 ```
 
+
 **Response**: `ElicitResult`
+
 ```json
 {
   "action": "accept",
@@ -176,7 +180,9 @@ async def handle_elicitation(params: types.ElicitRequestParams) -> types.ElicitR
         return types.ElicitResult(action="decline")
 ```
 
+
 **Key Points**:
+
 - Handler must be registered before connecting
 - Schema validation is server-side; client is responsible for UI presentation
 - Client can return `decline` or `cancel` without content
@@ -193,9 +199,11 @@ The server validates `requestedSchema` to ensure spec compliance. Per the protoc
 1. Root `type` must be `"object"`
 2. `properties` must be a non-empty object
 3. Each property schema must have `type` in: `string`, `number`, `integer`, `boolean`
+
 4. Nested structures, `anyOf`, `allOf`, etc. are **not supported**
 
 ### Valid Example
+
 ```python
 {
     "type": "object",
@@ -205,10 +213,12 @@ The server validates `requestedSchema` to ensure spec compliance. Per the protoc
         "subscribe": {"type": "boolean"}
     },
     "required": ["username"]
+
 }
 ```
 
 ### Invalid Example (nested object)
+
 ```python
 {
     "type": "object",
@@ -386,7 +396,7 @@ with server.binding():
 - **Resources**: `docs/openmcp/resources.md` (resource handlers with elicitation)
 - **Sampling**: `docs/openmcp/sampling.md` (server-to-client LLM requests)
 - **Context**: `docs/openmcp/context.md` (`get_context()` for logging inside handlers)
-- **Spec**: `https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation`
+- **Spec**: `https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation`
 
 ---
 

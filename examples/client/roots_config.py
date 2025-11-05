@@ -55,7 +55,7 @@ async def main() -> None:
     )
 
     async with open_connection(
-        target=SERVER_URL,
+        url=SERVER_URL,
         transport="streamable-http",
         capabilities=capabilities,
     ) as client:

@@ -10,7 +10,7 @@ Implements the prompts capability as specified in the Model Context Protocol:
 
 - https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
   (prompts capability, list and get operations, list-changed notifications)
-- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+- https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination
   (cursor-based pagination for prompts/list)
 
 Handles prompt registration, argument validation, and result coercion from
@@ -53,36 +53,34 @@ class PromptsService:
         return sorted(self._prompt_defs)
 
     async def list_prompts(self, request: types.ListPromptsRequest) -> types.ListPromptsResult:
-        cursor = request.params.cursor if request.params is not None else None
-        prompts = list(self._prompt_defs.values())
-        page, next_cursor = paginate_sequence(prompts, cursor, limit=self._pagination_limit)
-        self.observers.remember_current_session()
-        return types.ListPromptsResult(prompts=page, nextCursor=next_cursor)
+        with context_scope():
+            cursor = request.params.cursor if request.params is not None else None
+            prompts = list(self._prompt_defs.values())
+            page, next_cursor = paginate_sequence(prompts, cursor, limit=self._pagination_limit)
+            self.observers.remember_current_session()
+            return types.ListPromptsResult(prompts=page, nextCursor=next_cursor)
 
     async def get_prompt(self, name: str, arguments: dict[str, str] | None) -> types.GetPromptResult:
-        spec = self._prompt_specs.get(name)
-        if spec is None:
-            raise McpError(types.ErrorData(code=types.INVALID_PARAMS, message=f"Prompt '{name}' is not registered"))
+        with context_scope():
+            spec = self._prompt_specs.get(name)
+            if spec is None:
+                raise McpError(types.ErrorData(code=types.INVALID_PARAMS, message=f"Prompt '{name}' is not registered"))
 
-        provided = dict(arguments or {})
-        missing = [arg.name for arg in (spec.arguments or []) if arg.required and arg.name not in provided]
-        if missing:
-            raise McpError(
-                types.ErrorData(
-                    code=types.INVALID_PARAMS, message=f"Missing required arguments: {', '.join(sorted(missing))}"
+            provided = dict(arguments or {})
+            missing = [arg.name for arg in (spec.arguments or []) if arg.required and arg.name not in provided]
+            if missing:
+                raise McpError(
+                    types.ErrorData(
+                        code=types.INVALID_PARAMS, message=f"Missing required arguments: {', '.join(sorted(missing))}"
+                    )
                 )
-            )
 
-        try:
             try:
-                with context_scope():
-                    rendered = await maybe_await_with_args(spec.fn, provided if spec.arguments else provided)  # type: ignore[arg-type]
-            except LookupError:
                 rendered = await maybe_await_with_args(spec.fn, provided if spec.arguments else provided)  # type: ignore[arg-type]
-        except TypeError as exc:
-            raise TypeError(str(exc)) from exc
+            except TypeError as exc:
+                raise TypeError(str(exc)) from exc
 
-        return self._coerce_prompt_result(spec, rendered)
+            return self._coerce_prompt_result(spec, rendered)
 
     async def notify_list_changed(self) -> None:
         notification = types.ServerNotification(types.PromptListChangedNotification(params=None))

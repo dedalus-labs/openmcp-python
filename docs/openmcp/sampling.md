@@ -10,7 +10,7 @@
 
 ## Specification
 
-https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
 
 The sampling capability enables servers to request LLM completions from clients through the `sampling/createMessage` JSON-RPC request. This is a **server-to-client** request: the server acts as requester, and the client handles the request by invoking its LLM and returning the result.
 
@@ -357,4 +357,4 @@ async def write_docs(topic: str) -> str:
 - **Elicitation**: Request structured user input instead of LLM completions (`docs/openmcp/elicitation.md`)
 - **Context API**: Access logging and progress from within tools (`docs/openmcp/context.md`)
 - **Tools**: Build tools that can invoke sampling (`docs/openmcp/tools.md`)
-- **MCP Specification**: Official sampling capability spec (https://modelcontextprotocol.io/specification/2025-06-18/server/sampling)
+- **MCP Specification**: Official sampling capability spec (https://modelcontextprotocol.io/specification/2025-06-18/client/sampling)

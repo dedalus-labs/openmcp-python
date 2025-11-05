@@ -21,12 +21,14 @@ from tests.helpers import DummySession, run_with_context
 
 @pytest.mark.asyncio
 async def test_binding_registers_tools():
+    """Synchronous tool registration and invocation works correctly."""
     server = MCPServer("demo")
 
     with server.binding():
 
         @tool(description="Adds two numbers")
         def add(a: int, b: int) -> int:
+            """Synchronous tool function."""
             return a + b
 
     assert "add" in server.tool_names
@@ -37,6 +39,12 @@ async def test_binding_registers_tools():
     assert result.content
     assert result.content[0].text == "11"
     assert result.structuredContent == {"result": 11}
+
+    # Verify schema is correct for sync tool
+    schema = server.tools.definitions["add"].inputSchema
+    assert schema["type"] == "object"
+    assert "a" in schema["properties"]
+    assert "b" in schema["properties"]
 
 
 @pytest.mark.asyncio
@@ -100,16 +108,48 @@ async def test_serve_dispatch(monkeypatch):
     monkeypatch.setattr(stdio_server, "serve_stdio", fake_stdio)
 
     await http_server.serve(host="0.0.0.0")
-    assert called_http == {"kwargs": {"host": "0.0.0.0"}}
+    assert called_http == {
+        "kwargs": {
+            "host": "0.0.0.0",
+            "port": 8000,
+            "path": "/mcp",
+            "log_level": "info",
+            "validate": False,
+            "announce": True,
+        }
+    }
 
     await http_server.serve(transport="streamable-http", port=9999)
-    assert called_http == {"kwargs": {"port": 9999}}
+    assert called_http == {
+        "kwargs": {
+            "host": "127.0.0.1",
+            "port": 9999,
+            "path": "/mcp",
+            "log_level": "info",
+            "validate": False,
+            "announce": True,
+        }
+    }
 
     await stdio_server.serve()
-    assert called_stdio == {"kwargs": {}}
+    assert called_stdio == {
+        "kwargs": {
+            "raise_exceptions": False,
+            "stateless": False,
+            "validate": False,
+            "announce": True,
+        }
+    }
 
     await stdio_server.serve(transport="stdio", stateless=True)
-    assert called_stdio == {"kwargs": {"stateless": True}}
+    assert called_stdio == {
+        "kwargs": {
+            "raise_exceptions": False,
+            "stateless": True,
+            "validate": False,
+            "announce": True,
+        }
+    }
 
     with pytest.raises(ValueError):
         await http_server.serve(transport="unknown")

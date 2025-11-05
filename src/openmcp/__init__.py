@@ -23,7 +23,11 @@ from .resource import resource
 from .resource_template import resource_template
 from .server import MCPServer, NotificationFlags
 from .server.authorization import AuthorizationConfig
+from .server.dependencies import Depends, register_injectable_type
 from .tool import tool
+
+# Register Context for auto-injection in dependencies
+register_injectable_type(Context)
 
 
 __all__ = [
@@ -41,4 +45,5 @@ __all__ = [
     "Context",
     "get_context",
     "AuthorizationConfig",
+    "Depends",
 ]

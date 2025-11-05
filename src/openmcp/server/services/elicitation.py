@@ -8,7 +8,7 @@
 
 Implements the elicitation capability as specified in the Model Context Protocol:
 
-- https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation
+- https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation
   (elicitation capability, create request for user input prompts)
 
 Provides adapter interface for servers to request user input from clients.

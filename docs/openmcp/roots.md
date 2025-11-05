@@ -177,7 +177,7 @@ class _CacheEntry:
 ```python
 def encode_cursor(self, session: ServerSession, offset: int) -> str:
     version = self.version(session)
-    data = orjson.dumps({"v": version, "o": offset})
+    data = json.dumps({"v": version, "o": offset}).encode()
     return base64.urlsafe_b64encode(data).decode()
 
 def decode_cursor(self, session: ServerSession, cursor: str | None) -> tuple[int, int]:
@@ -536,7 +536,7 @@ server.roots = RootsService(
 ## See Also
 
 - **Specification**: `https://modelcontextprotocol.io/specification/2025-06-18/client/roots`
-- **Pagination**: `https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination`
+- **Pagination**: `https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination`
 - **Reference implementation**: `src/openmcp/server/services/roots.py` (RootGuard: lines 57-100)
 - **Related docs**:
   - `docs/openmcp/tools.md` — Tool registration and schema inference

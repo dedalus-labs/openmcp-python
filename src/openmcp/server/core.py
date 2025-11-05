@@ -9,15 +9,13 @@
 from __future__ import annotations
 
 import base64
-from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 import inspect
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Literal, Mapping
 
 import anyio
-import anyio.abc
 
 from .transports.base import BaseTransport, TransportFactory
 from .._sdk_loader import ensure_sdk_importable
@@ -25,11 +23,17 @@ from .._sdk_loader import ensure_sdk_importable
 
 ensure_sdk_importable()
 
+try:
+    import uvloop
+    uvloop.install()
+    _USING_UVLOOP = True
+except ImportError:
+    _USING_UVLOOP = False
+
 from mcp import types
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.lowlevel.server import NotificationOptions, Server, request_ctx
 from mcp.server.lowlevel.server import lifespan as default_lifespan
-from mcp.server.models import InitializationOptions
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import McpError
 from mcp.shared.session import RequestResponder
@@ -46,6 +50,17 @@ from .services import (
     RootsService,
     SamplingService,
     ToolsService,
+)
+from .services.protocols import (
+    CompletionServiceProtocol,
+    ElicitationServiceProtocol,
+    LoggingServiceProtocol,
+    PingServiceProtocol,
+    PromptsServiceProtocol,
+    ResourcesServiceProtocol,
+    RootsServiceProtocol,
+    SamplingServiceProtocol,
+    ToolsServiceProtocol,
 )
 from .subscriptions import SubscriptionManager
 from .transports import ASGIRunConfig, StdioTransport, StreamableHTTPTransport
@@ -68,6 +83,8 @@ from ..utils import get_logger
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from anyio.abc import TaskGroup
+    from mcp.server.models import InitializationOptions
     from mcp.server.session import ServerSession
 
 TransportLiteral = Literal["stdio", "streamable-http"]
@@ -81,6 +98,24 @@ class NotificationFlags:
     resources_changed: bool = False
     tools_changed: bool = False
     roots_changed: bool = False
+
+
+class ServerValidationError(RuntimeError):
+    """Raised when the server configuration violates MCP requirements."""
+
+
+# TODO: Temporary patch until we get proper versioning logic (that pervades the docs too).
+_SPEC_URLS = {
+    "tools": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+    "resources": "https://modelcontextprotocol.io/specification/2025-06-18/server/resources",
+    "prompts": "https://modelcontextprotocol.io/specification/2025-06-18/server/prompts",
+    "roots": "https://modelcontextprotocol.io/specification/2025-06-18/client/roots",
+    "sampling": "https://modelcontextprotocol.io/specification/2025-06-18/client/sampling",
+    "elicitation": "https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation",
+    "completions": "https://modelcontextprotocol.io/specification/2025-06-18/server/completions",
+    "logging": "https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging",
+    "ping": "https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/ping",
+}
 
 
 class MCPServer(Server[Any, Any]):
@@ -104,6 +139,7 @@ class MCPServer(Server[Any, Any]):
         http_security: TransportSecuritySettings | None = None,
         authorization: AuthorizationConfig | None = None,
         streamable_http_stateless: bool = False,
+        allow_dynamic_tools: bool = False,
     ) -> None:
         self._notification_flags = notification_flags or NotificationFlags()
         self._experimental_capabilities = {key: dict(value) for key, value in (experimental_capabilities or {}).items()}
@@ -112,17 +148,22 @@ class MCPServer(Server[Any, Any]):
         )
         self._default_transport = transport.lower() if transport else "streamable-http"
         self._logger = get_logger(f"openmcp.server.{name}")
-        self._notification_sink = notification_sink or DefaultNotificationSink()
 
-        self._subscription_manager = SubscriptionManager()
-        self.resources = ResourcesService(
+        # Log event loop implementation
+        loop_impl = "uvloop" if _USING_UVLOOP else "asyncio"
+        self._logger.debug("Event loop: %s", loop_impl)
+
+        self._notification_sink: NotificationSink = notification_sink or DefaultNotificationSink()
+
+        self._subscription_manager: SubscriptionManager = SubscriptionManager()
+        self.resources: ResourcesService = ResourcesService(
             subscription_manager=self._subscription_manager,
             logger=self._logger,
             pagination_limit=self._PAGINATION_LIMIT,
             notification_sink=self._notification_sink,
         )
-        self.roots = RootsService(self._call_roots_list)
-        self.tools = ToolsService(
+        self.roots: RootsService = RootsService(self._call_roots_list)
+        self.tools: ToolsService = ToolsService(
             server_ref=self,
             attach_callable=self._attach_tool,
             detach_callable=self._detach_tool,
@@ -130,20 +171,24 @@ class MCPServer(Server[Any, Any]):
             pagination_limit=self._PAGINATION_LIMIT,
             notification_sink=self._notification_sink,
         )
-        self.prompts = PromptsService(
+        self.prompts: PromptsService = PromptsService(
             logger=self._logger, pagination_limit=self._PAGINATION_LIMIT, notification_sink=self._notification_sink
         )
-        self.completions = CompletionService()
-        self.logging_service = LoggingService(self._logger, notification_sink=self._notification_sink)
-        self.sampling = SamplingService()
-        self.elicitation = ElicitationService()
-        self.ping = PingService(notification_sink=self._notification_sink, logger=self._logger)
+        self.completions: CompletionService = CompletionService()
+        self.logging_service: LoggingService = LoggingService(self._logger, notification_sink=self._notification_sink)
+        self.sampling: SamplingService = SamplingService()
+        self.elicitation: ElicitationService = ElicitationService()
+        self.ping: PingService = PingService(notification_sink=self._notification_sink, logger=self._logger)
 
         self._http_security_settings = (
             http_security if http_security is not None else self._default_http_security_settings()
         )
 
         self._streamable_http_stateless = streamable_http_stateless
+        self._allow_dynamic_tools = allow_dynamic_tools
+        self._runtime_started = False
+        self._tool_mutation_pending_notification = False
+        self._binding_depth = 0
 
         self._authorization_manager: AuthorizationManager | None = None
         if authorization and authorization.enabled:
@@ -165,7 +210,8 @@ class MCPServer(Server[Any, Any]):
 
         @self.list_resources()
         async def _list_resources(request: types.ListResourcesRequest) -> types.ListResourcesResult:
-            return await self.resources.list_resources(request)
+            result: types.ListResourcesResult = await self.resources.list_resources(request)
+            return result
 
         @self.read_resource()
         async def _read_resource(uri: types.AnyUrl) -> list[ReadResourceContents]:
@@ -184,11 +230,13 @@ class MCPServer(Server[Any, Any]):
         @self.list_resource_templates()
         async def _list_templates(request: types.ListResourceTemplatesRequest) -> types.ListResourceTemplatesResult:
             cursor = request.params.cursor if request.params is not None else None
-            return await self.resources.list_templates(cursor)
+            result: types.ListResourceTemplatesResult = await self.resources.list_templates(cursor)
+            return result
 
         @self.list_tools()
         async def _list_tools(request: types.ListToolsRequest) -> types.ListToolsResult:
-            return await self.tools.list_tools(request)
+            result: types.ListToolsResult = await self.tools.list_tools(request)
+            return result
 
         @self.call_tool(validate_input=False)
         async def _call_tool(
@@ -224,11 +272,13 @@ class MCPServer(Server[Any, Any]):
 
         @self.list_prompts()
         async def _list_prompts(request: types.ListPromptsRequest) -> types.ListPromptsResult:
-            return await self.prompts.list_prompts(request)
+            result: types.ListPromptsResult = await self.prompts.list_prompts(request)
+            return result
 
         @self.get_prompt()
         async def _get_prompt(name: str, arguments: dict[str, str] | None) -> types.GetPromptResult:
-            return await self.prompts.get_prompt(name, arguments)
+            result: types.GetPromptResult = await self.prompts.get_prompt(name, arguments)
+            return result
 
         @self.set_logging_level()
         async def _set_logging_level(level: types.LoggingLevel) -> None:
@@ -276,7 +326,9 @@ class MCPServer(Server[Any, Any]):
 
         return await self.ping_client(context.session, timeout=timeout)
 
-    async def _handle_message(self, message, session, lifespan_context, raise_exceptions: bool = False):
+    async def _handle_message(
+        self, message: Any, session: Any, lifespan_context: Any, raise_exceptions: bool = False
+    ) -> None:
         if isinstance(message, (RequestResponder, types.ClientNotification)):
             self.ping.register(session)
             self.ping.touch(session)
@@ -284,7 +336,7 @@ class MCPServer(Server[Any, Any]):
 
     def start_ping_heartbeat(
         self,
-        task_group: anyio.abc.TaskGroup,
+        task_group: "TaskGroup",
         *,
         interval: float = 5.0,
         jitter: float = 0.2,
@@ -317,7 +369,7 @@ class MCPServer(Server[Any, Any]):
     def register_prompt(self, target: PromptSpec | Callable[..., Any]) -> PromptSpec:
         return self.prompts.register(target)
 
-    def register_completion(self, target) -> CompletionSpec:
+    def register_completion(self, target: CompletionSpec | Callable[..., Any]) -> CompletionSpec:
         return self.completions.register(target)
 
     async def invoke_tool(self, name: str, **arguments: Any) -> types.CallToolResult:
@@ -340,14 +392,14 @@ class MCPServer(Server[Any, Any]):
     async def request_sampling(self, params: types.CreateMessageRequestParams) -> types.CreateMessageResult:
         """Proxy ``sampling/createMessage`` request to client.
 
-        See: https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+        See: https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
         """
         return await self.sampling.create_message(params)
 
     async def request_elicitation(self, params: types.ElicitRequestParams) -> types.ElicitResult:
         """Proxy ``elicitation/create`` request to client.
 
-        See: https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation
+        See: https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation
         """
         return await self.elicitation.create(params)
 
@@ -362,8 +414,15 @@ class MCPServer(Server[Any, Any]):
             await self.resources.notify_list_changed()
 
     async def notify_tools_list_changed(self) -> None:
+        if self._tool_mutation_pending_notification:
+            self._tool_mutation_pending_notification = False
         if self._notification_flags.tools_changed:
             await self.tools.notify_list_changed()
+        elif self._allow_dynamic_tools:
+            self._logger.warning(
+                "tools/list_changed notification requested but NotificationFlags.tools_changed is disabled; "
+                "clients may not learn about dynamic changes."
+            )
 
     async def notify_prompts_list_changed(self) -> None:
         if self._notification_flags.prompts_changed:
@@ -371,6 +430,26 @@ class MCPServer(Server[Any, Any]):
 
     async def log_message(self, level: types.LoggingLevel, data: Any, *, logger: str | None = None) -> None:
         await self.logging_service.emit(level, data, logger)
+
+    # //////////////////////////////////////////////////////////////////
+    # Mutation tracking helpers
+    # //////////////////////////////////////////////////////////////////
+
+    def record_tool_mutation(self, *, operation: str) -> None:
+        """Public entry point for capability services to report tool registry changes."""
+
+        self._record_tool_mutation(operation=operation)
+
+    def _record_tool_mutation(self, *, operation: str) -> None:
+        """Track tool mutations so static servers can block them and dynamic servers can warn."""
+        if self._runtime_started and not self._allow_dynamic_tools:
+            raise RuntimeError(
+                "Tool mutation attempted after server startup. Enable allow_dynamic_tools=True to permit runtime changes."
+            )
+
+        if self._runtime_started and self._allow_dynamic_tools:
+            self._tool_mutation_pending_notification = True
+
 
     def require_within_roots(self, *, argument: str = "path") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Decorator enforcing that a handler argument resolves within allowed roots."""
@@ -409,8 +488,13 @@ class MCPServer(Server[Any, Any]):
 
         return decorator
 
-    async def _call_roots_list(self, session, params: Mapping[str, Any] | None) -> Mapping[str, Any]:
-        request = types.ListRootsRequest(params=params)
+    async def _call_roots_list(
+        self, session: "ServerSession", params: Mapping[str, Any] | None
+    ) -> Mapping[str, Any]:
+        list_params: types.RequestParams | None = None
+        if params is not None:
+            list_params = types.RequestParams.model_validate(params)
+        request = types.ListRootsRequest(params=list_params)
         result = await session.send_request(types.ServerRequest(request), types.ListRootsResult)
         payload: dict[str, Any] = {"roots": [root.model_dump(by_alias=True) for root in result.roots]}
         next_cursor = getattr(result, "nextCursor", None)
@@ -439,26 +523,27 @@ class MCPServer(Server[Any, Any]):
 
     def create_initialization_options(
         self,
-        *,
-        notification_flags: NotificationFlags | None = None,
+        notification_options: NotificationOptions | None = None,
         experimental_capabilities: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> InitializationOptions:
-        flags = notification_flags or self._notification_flags
+        flags = self._notification_flags
+        effective_notifications = notification_options or NotificationOptions(
+            prompts_changed=flags.prompts_changed,
+            resources_changed=flags.resources_changed,
+            tools_changed=flags.tools_changed,
+        )
         experimental = experimental_capabilities or self._experimental_capabilities
 
         return super().create_initialization_options(
-            notification_options=NotificationOptions(
-                prompts_changed=flags.prompts_changed,
-                resources_changed=flags.resources_changed,
-                tools_changed=flags.tools_changed,
-            ),
+            notification_options=effective_notifications,
             experimental_capabilities={key: dict(value) for key, value in experimental.items()},
         )
 
     def get_capabilities(
         self, notification_options: NotificationOptions, experimental_capabilities: Mapping[str, Mapping[str, Any]]
     ) -> types.ServerCapabilities:
-        caps = super().get_capabilities(notification_options, experimental_capabilities)
+        experimental_dict = {key: dict(value) for key, value in experimental_capabilities.items()}
+        caps = super().get_capabilities(notification_options, experimental_dict)
 
         if caps.resources is not None:
             caps.resources.subscribe = True
@@ -485,7 +570,8 @@ class MCPServer(Server[Any, Any]):
     # //////////////////////////////////////////////////////////////////
 
     @contextmanager
-    def binding(self):
+    def binding(self) -> Iterator["MCPServer"]:
+        self._binding_depth += 1
         tool_token = set_tool_server(self)
         resource_token = set_resource_server(self)
         completion_token = set_completion_server(self)
@@ -499,6 +585,17 @@ class MCPServer(Server[Any, Any]):
             reset_completion_server(completion_token)
             reset_prompt_server(prompt_token)
             reset_resource_template_server(template_token)
+            self._binding_depth -= 1
+            if (
+                self._binding_depth == 0
+                and self._runtime_started
+                and self._allow_dynamic_tools
+                and self._tool_mutation_pending_notification
+            ):
+                self._logger.warning(
+                    "Tools were mutated in dynamic mode without emitting notifications/tools/list_changed. "
+                    "Call notify_tools_list_changed() so clients can refresh their state."
+                )
 
     # //////////////////////////////////////////////////////////////////
     # Transport registry
@@ -536,20 +633,90 @@ class MCPServer(Server[Any, Any]):
     # Transport helpers
     # //////////////////////////////////////////////////////////////////
 
-    async def serve_stdio(self, *, raise_exceptions: bool = False, stateless: bool = False) -> None:
+    async def serve_stdio(
+        self,
+        *,
+        raise_exceptions: bool = False,
+        stateless: bool = False,
+        validate: bool = True,
+        announce: bool = True,
+    ) -> None:
+        self._runtime_started = True
+        if validate:
+            self.validate()
         transport = self._transport_for_name("stdio")
+        if announce:
+            mode = "stateless" if stateless else "stateful"
+            self._logger.info("Serving %s via STDIO (%s)", self.name, mode)
         await transport.run(raise_exceptions=raise_exceptions, stateless=stateless)
 
-    async def serve(self, *, transport: str | None = None, **kwargs: Any) -> None:
+    async def serve(
+        self,
+        *,
+        transport: str | None = None,
+        validate: bool = True,
+        verbose: bool = True,
+        host: str = "127.0.0.1",
+        port: int = 8000,
+        path: str = "/mcp",
+        log_level: str = "info",
+        stateless: bool = False,
+        raise_exceptions: bool = False,
+        uvicorn_options: Mapping[str, Any] | None = None,
+        **transport_kwargs: Any,
+    ) -> None:
         selected = (transport or self._default_transport).lower()
-        if selected in {"stdio", "streamable-http", "streamable_http", "http", "shttp"}:
+        self._runtime_started = True
+
+        if validate:
+            self.validate()
+
+        if selected in {
+            "stdio",
+            "streamable-http",
+            "streamable_http",
+            "http",
+            "shttp",
+        }:
+
             if selected == "stdio":
-                await self.serve_stdio(**kwargs)
+                if transport_kwargs:
+                    unexpected = ", ".join(sorted(transport_kwargs))
+                    raise TypeError(f"Unsupported STDIO serve() parameters: {unexpected}")
+                await self.serve_stdio(
+                    raise_exceptions=raise_exceptions,
+                    stateless=stateless,
+                    validate=False,
+                    announce=verbose,
+                )
                 return
-            await self.serve_streamable_http(**kwargs)
+
+            if transport_kwargs:
+                unexpected = ", ".join(sorted(transport_kwargs))
+                raise TypeError(f"Unsupported Streamable HTTP serve() parameters: {unexpected}")
+
+            extra_http = dict(uvicorn_options or {})
+            await self.serve_streamable_http(
+                host=host,
+                port=port,
+                path=path,
+                log_level=log_level,
+                validate=False,
+                announce=verbose,
+                **extra_http,
+            )
             return
+
         transport_instance = self._transport_for_name(selected)
-        await transport_instance.run(**kwargs)
+
+        if verbose:
+            self._logger.info(
+                "Serving %s via %s transport",
+                self.name,
+                transport_instance.transport_display_name,
+            )
+
+        await transport_instance.run(**transport_kwargs)
 
     async def serve_streamable_http(
         self,
@@ -557,8 +724,13 @@ class MCPServer(Server[Any, Any]):
         port: int = 8000,
         path: str = "/mcp",
         log_level: str = "info",
+        *,
+        validate: bool = True,
+        announce: bool = True,
         **uvicorn_options: Any,
     ) -> None:
+        if validate:
+            self.validate()
         transport = self._transport_for_name("streamable-http")
         run_config = ASGIRunConfig(
             host=host,
@@ -567,7 +739,98 @@ class MCPServer(Server[Any, Any]):
             log_level=log_level,
             uvicorn_options=dict(uvicorn_options),
         )
+        if announce:
+            base_url = f"http://{host}:{port}{path}"
+            if self._streamable_http_stateless:
+                self._logger.info(
+                    "Serving %s via Streamable HTTP (stateless) at %s",
+                    self.name,
+                    base_url,
+                )
+            else:
+                self._logger.info("Serving %s via Streamable HTTP at %s", self.name, base_url)
         await transport.run(config=run_config)
+
+    # //////////////////////////////////////////////////////////////////
+    # Validation
+    # //////////////////////////////////////////////////////////////////
+
+    def validate(self) -> None:
+        """Validate the server configuration against MCP requirements.
+
+        Validation ensures that each advertised capability is backed by a service
+        implementing the behaviour mandated by the specification.  This keeps the
+        framework "plug-and-play" without allowing integrators to accidentally
+        ship a server that violates the MCP contract.
+        """
+        errors: list[str] = []
+
+        tools_service: Any = self.tools
+        if not isinstance(tools_service, ToolsServiceProtocol):
+            errors.append(
+                "Tools capability requires a service implementing list/listChanged operations "
+                f"({_SPEC_URLS['tools']})."
+            )
+
+        resources_service: Any = self.resources
+        if not isinstance(resources_service, ResourcesServiceProtocol):
+            errors.append(
+                "Resources capability requires list/read/notify support "
+                f"({_SPEC_URLS['resources']})."
+            )
+
+        prompts_service: Any = self.prompts
+        if not isinstance(prompts_service, PromptsServiceProtocol):
+            errors.append(
+                "Prompts capability requires list/get/notify support "
+                f"({_SPEC_URLS['prompts']})."
+            )
+
+        roots_service: Any = self.roots
+        if not isinstance(roots_service, RootsServiceProtocol):
+            errors.append(
+                "Roots capability requires guard and session lifecycle handlers "
+                f"({_SPEC_URLS['roots']})."
+            )
+
+        completions_service: Any = self.completions
+        if not isinstance(completions_service, CompletionServiceProtocol):
+            errors.append(
+                "Completions capability requires register/execute support "
+                f"({_SPEC_URLS['completions']})."
+            )
+
+        sampling_service: Any = self.sampling
+        if not isinstance(sampling_service, SamplingServiceProtocol):
+            errors.append(
+                "Sampling capability requires create_message handling "
+                f"({_SPEC_URLS['sampling']})."
+            )
+
+        elicitation_service: Any = self.elicitation
+        if not isinstance(elicitation_service, ElicitationServiceProtocol):
+            errors.append(
+                "Elicitation capability requires create handling "
+                f"({_SPEC_URLS['elicitation']})."
+            )
+
+        logging_service: Any = self.logging_service
+        if not isinstance(logging_service, LoggingServiceProtocol):
+            errors.append(
+                "Logging capability requires set_level and emit support "
+                f"({_SPEC_URLS['logging']})."
+            )
+
+        ping_service: Any = self.ping
+        if not isinstance(ping_service, PingServiceProtocol):
+            errors.append(
+                "Ping capability requires ping/ping_many/heartbeat support "
+                f"({_SPEC_URLS['ping']})."
+            )
+
+        if errors:
+            bullet_list = "\n - ".join(errors)
+            raise ServerValidationError(f"MCPServer configuration is invalid:\n - {bullet_list}")
 
     # //////////////////////////////////////////////////////////////////
     # Internal helpers

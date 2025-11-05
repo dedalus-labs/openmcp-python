@@ -33,9 +33,9 @@ when sessions disconnect.
 The subscription capability is defined in the MCP 2025-06-18 specification:
 
 - **Core capability**: https://modelcontextprotocol.io/specification/2025-06-18/server/resources
-- **Subscribe operation**: https://modelcontextprotocol.io/specification/2025-06-18/basic/messages/resources-subscribe
-- **Unsubscribe operation**: https://modelcontextprotocol.io/specification/2025-06-18/basic/messages/resources-unsubscribe
-- **Update notification**: https://modelcontextprotocol.io/specification/2025-06-18/basic/messages/resources-updated
+- **Subscribe operation**: https://modelcontextprotocol.io/specification/2025-06-18/schema-reference/resources-subscribe
+- **Unsubscribe operation**: https://modelcontextprotocol.io/specification/2025-06-18/schema-reference/resources-unsubscribe
+- **Update notification**: https://modelcontextprotocol.io/specification/2025-06-18/schema-reference/notifications-resources-updated
 
 The spec requires:
 

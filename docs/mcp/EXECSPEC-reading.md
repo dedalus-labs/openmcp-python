@@ -194,3 +194,91 @@ Read every document under `docs/mcp`, capture notable requirements, ambiguities,
 | `capabilities/elicitation/request-schema.md` | DONE (2025-11-04) | Describes allowed flat JSON schema (primitive types). |
 | `capabilities/elicitation/response-actions.md` | DONE (2025-11-04) | Explains `accept` vs `decline` vs `cancel`. |
 | `capabilities/elicitation/security-considerations.md` | DONE (2025-11-04) | Ban sensitive requests, require approval, validation, rate limits. |
+| `capabilities/sampling/index.md` | DONE (2025-11-04) | Describes client-mediated LLM completions. |
+| `capabilities/sampling/user-interaction-model.md` | DONE (2025-11-04) | Emphasizes human approval for sampling. |
+| `capabilities/sampling/capabilities.md` | DONE (2025-11-04) | Clients advertise `sampling`. |
+| `capabilities/sampling/protocol-messages.md` | DONE (2025-11-04) | Defines `sampling/createMessage` request/response fields. |
+| `capabilities/sampling/message-flow.md` | DONE (2025-11-04) | Diagram with human-in-loop approvals. |
+| `capabilities/sampling/data-types.md` | DONE (2025-11-04) | Documents message content types and model preference hints. |
+| `capabilities/sampling/error-handling.md` | DONE (2025-11-04) | Example error for user rejection. |
+| `capabilities/sampling/security-considerations.md` | DONE (2025-11-04) | Advocates approval controls, validation, rate limiting. |
+| `capabilities/versioning/index.md` | DONE (2025-11-04) | Explains date-based version strings. |
+| `capabilities/versioning/negotiation.md` | DONE (2025-11-04) | Notes init-phase negotiation + graceful failure. |
+| `capabilities/versioning/revisions.md` | DONE (2025-11-04) | Defines draft/current/final status; current=2025-06-18. |
+| `spec/overview/index.md` | DONE (2025-11-04) | Lists protocol components (base, lifecycle, auth, features, utilities). |
+| `spec/overview/messages.md` | DONE (2025-11-04) | Recaps JSON-RPC request/response/notification shapes and rules. |
+| `spec/overview/auth.md` | DONE (2025-11-04) | Notes optional HTTP auth spec; STDIO should use env. |
+| `spec/overview/schema.md` | DONE (2025-11-04) | Points to TypeScript/JSON schema, `_meta` key conventions. |
+| `spec/key-changes/index.md` | DONE (2025-11-04) | Introduces 2025-06-18 vs 2025-03-26 diffs. |
+| `spec/key-changes/major-changes.md` | DONE (2025-11-04) | Lists major updates (drop batching, structured outputs, OAuth changes, elicitation, etc.). |
+| `spec/key-changes/other-schema-changes.md` | DONE (2025-11-04) | Notes `_meta`, completion context, title fields. |
+| `spec/key-changes/full-changelog.md` | DONE (2025-11-04) | Points to GitHub compare. |
+| `spec/specification/index.md` | DONE (2025-11-04) | Intro to full spec + normative language. |
+| `spec/specification/overview.md` | DONE (2025-11-04) | Positions MCP similar to LSP; host/client/server roles. |
+| `spec/specification/key-details.md` | DONE (2025-11-04) | Summarizes base protocol, features, utilities. |
+| `spec/specification/security-and-trust-safety.md` | DONE (2025-11-04) | Provides consent, privacy, tool safety guidance. |
+| `spec/specification/learn-more.md` | DONE (2025-11-04) | Links to deeper sections. |
+| `spec/schema-reference/index.md` | DONE (2025-11-04) | Entry point to typed schema docs. |
+| `spec/schema-reference/common-types.md` | DONE (2025-11-04) | Typedoc for shared interfaces (Annotations, content blocks, etc.). |
+| `spec/schema-reference/initialize.md` | DONE (2025-11-04) | Defines init request/response, client/server capability objects. |
+| `spec/schema-reference/completion-complete.md` | DONE (2025-11-04) | Typed schema for `completion/complete` request/result. |
+| `spec/schema-reference/elicitation-create.md` | DONE (2025-11-04) | Schema for elicitation create request + result actions. |
+| `spec/schema-reference/logging-setlevel.md` | DONE (2025-11-04) | Schema for `logging/setLevel` request/empty result. |
+| `spec/schema-reference/notifications-cancelled.md` | DONE (2025-11-04) | Defines cancellation notification params. |
+| `spec/schema-reference/notifications-initialized.md` | DONE (2025-11-04) | Defines `notifications/initialized` payload (no params). |
+| `spec/schema-reference/notifications-message.md` | DONE (2025-11-04) | Log message notification fields (`level`, `logger`, `data`). |
+| `spec/schema-reference/notifications-progress.md` | DONE (2025-11-04) | Progress notification schema (`progressToken`, `progress`, `total`, `message`). |
+| `spec/schema-reference/notifications-prompts-list-changed.md` | DONE (2025-11-04) | List_changed notification schema. |
+| `spec/schema-reference/notifications-resources-list-changed.md` | DONE (2025-11-04) | Resource list change notification schema. |
+| `spec/schema-reference/notifications-resources-updated.md` | DONE (2025-11-04) | Resource updated notification schema. |
+| `spec/schema-reference/notifications-roots-list-changed.md` | DONE (2025-11-04) | Roots change notification schema. |
+| `spec/schema-reference/notifications-tools-list-changed.md` | DONE (2025-11-04) | Tools list change notification schema. |
+| `spec/schema-reference/ping.md` | DONE (2025-11-04) | Ping request/empty result schema. |
+| `spec/schema-reference/prompts-get.md` | DONE (2025-11-04) | Schema for `prompts/get` params/results. |
+| `spec/schema-reference/prompts-list.md` | DONE (2025-11-04) | Schema for `prompts/list` request/result with pagination. |
+| `spec/schema-reference/resources-list.md` | DONE (2025-11-04) | Schema for resource listing. |
+| `spec/schema-reference/resources-read.md` | DONE (2025-11-04) | Schema for reading resource contents. |
+| `spec/schema-reference/resources-subscribe.md` | DONE (2025-11-04) | Schema for resource subscription/unsubscription (w/ general subscribe). |
+| `spec/schema-reference/resources-templates-list.md` | DONE (2025-11-04) | Schema for resource template list responses. |
+| `spec/schema-reference/resources-unsubscribe.md` | DONE (2025-11-04) | Schema for unsubscribe request. |
+| `spec/schema-reference/roots-list.md` | DONE (2025-11-04) | Schema for enumerating roots. |
+| `spec/schema-reference/sampling-createmessage.md` | DONE (2025-11-04) | Schema for `sampling/createMessage` params/result. |
+| `spec/schema-reference/tools-call.md` | DONE (2025-11-04) | Schema for tool invocation and result (including structuredContent). |
+| `spec/schema-reference/tools-list.md` | DONE (2025-11-04) | Schema for tool listing responses. |
+| `README.md` | DONE (2025-11-04) | Navigator for modular docs (getting-started/core/capabilities/spec). |
+| `governance/antitrust-policy/index.md` | DONE (2025-11-04) | Antitrust policy overview. |
+| `governance/antitrust-policy/introduction.md` | DONE (2025-11-04) | States purpose, compliance expectations. |
+| `governance/antitrust-policy/conduct-of-meetings.md` | DONE (2025-11-04) | Lists prohibited topics and meeting procedures. |
+| `governance/antitrust-policy/participation.md` | DONE (2025-11-04) | Participation open subject to charter compliance. |
+| `governance/antitrust-policy/requirements-standard-setting.md` | DONE (2025-11-04) | Guidance on requirements creation without restricting competition. |
+| `governance/antitrust-policy/contact-information.md` | DONE (2025-11-04) | Provides contact email for antitrust matters. |
+| `governance/contributor-communication/index.md` | DONE (2025-11-04) | Overview of communication strategy. |
+| `governance/contributor-communication/communication-channels.md` | DONE (2025-11-04) | Details Discord, GitHub Discussions, Issues usage; security process. |
+| `governance/contributor-communication/decision-records.md` | DONE (2025-11-04) | Where decisions are documented and what context to capture. |
+| `governance/governance-and-stewardship/index.md` | DONE (2025-11-04) | Overview of governance model. |
+| `governance/governance-and-stewardship/communication.md` | DONE (2025-11-04) | Describes meetings and public chat expectations. |
+| `governance/governance-and-stewardship/current-core-maintainers.md` | DONE (2025-11-04) | Lists current core maintainers. |
+| `governance/governance-and-stewardship/current-maintainers-and-working-groups.md` | DONE (2025-11-04) | Points to maintainers list in repo. |
+| `governance/governance-and-stewardship/technical-governance.md` | DONE (2025-11-04) | Explains hierarchy (contributors→maintainers→core→lead). |
+| `governance/governance-and-stewardship/processes.md` | DONE (2025-11-04) | Details contribution processes, WG/IG structure, SEP workflow. |
+| `governance/governance-and-stewardship/nominating-confirming-and-removing-maintainers.md` | DONE (2025-11-04) | Covers nomination principles and step-by-step process. |
+| `governance/roadmap/index.md` | DONE (2025-11-04) | Roadmap overview (6-month horizon, changelog link). |
+| `governance/roadmap/agents.md` | DONE (2025-11-04) | Focus on async operations for agentic workflows. |
+| `governance/roadmap/authentication-and-security.md` | DONE (2025-11-04) | Plans for security guides, alt DCR, fine-grained auth, SSO, secure elicitation. |
+| `governance/roadmap/multimodality.md` | DONE (2025-11-04) | Targets additional media + streaming support. |
+| `governance/roadmap/registry.md` | DONE (2025-11-04) | Plans for MCP registry API for discovery. |
+| `governance/roadmap/validation.md` | DONE (2025-11-04) | Reference implementations + compliance suites. |
+| `governance/roadmap/get-involved.md` | DONE (2025-11-04) | Invites participation via GitHub discussions. |
+| `governance/sep-guidelines/index.md` | DONE (2025-11-04) | Overview of SEP process. |
+| `governance/sep-guidelines/what-is-a-sep.md` | DONE (2025-11-04) | Defines SEPs and their purpose. |
+| `governance/sep-guidelines/what-qualifies-a-sep.md` | DONE (2025-11-04) | Criteria for when SEP required. |
+| `governance/sep-guidelines/sep-types.md` | DONE (2025-11-04) | Describes standards/informational/process SEPs. |
+| `governance/sep-guidelines/submitting-a-sep.md` | DONE (2025-11-04) | Workflow, format, states, review requirements. |
+| `governance/sep-guidelines/reporting-sep-bugs-or-submitting-sep-updates.md` | DONE (2025-11-04) | Guidance on filing updates/bugs. |
+| `governance/sep-guidelines/transferring-sep-ownership.md` | DONE (2025-11-04) | Rules for transferring authorship. |
+| `governance/sep-guidelines/copyright.md` | DONE (2025-11-04) | Places guidelines in public domain/CC0. |
+| `governance/working-and-interest-groups/index.md` | DONE (2025-11-04) | Explains IG vs WG roles. |
+| `governance/working-and-interest-groups/purpose.md` | DONE (2025-11-04) | States goals (focused discussions, clear leadership). |
+| `governance/working-and-interest-groups/mechanisms.md` | DONE (2025-11-04) | Details lifecycle/creation templates for IGs & WGs. |
+| `governance/working-and-interest-groups/wg-ig-facilitators.md` | DONE (2025-11-04) | Defines facilitator role. |
+| `governance/working-and-interest-groups/faq.md` | DONE (2025-11-04) | FAQ on contributing and list locations. |

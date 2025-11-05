@@ -4,105 +4,176 @@
 #               github.com/dedalus-labs/openmcp-python/LICENSE
 # ==============================================================================
 
-# TODO: structlog or keep lightweight?
+"""Minimal logging utilities for OpenMCP.
 
-"""Logging utilities for OpenMCP.
+The default setup uses only Python's standard library to stay lightweight and
+dependency-free. You can enable structured JSON output and plug in a faster
+serializer like orjson without increasing the base footprint
 
-This mirrors the richer logger used in ``api-final`` while keeping the surface
-area minimal.  It supports Rich-based console output, optional JSON logging, and
-is idempotent by default.
-
-Environment variables:
-* ``OPENMCP_LOG_LEVEL`` – override log level (default: INFO)
-* ``OPENMCP_LOG_JSON`` – emit JSON logs when set
-* ``OPENMCP_LOG_DISABLE_RICH`` – disable Rich console handler
+See examples/advanced/custom_logging for example usage.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+import json
 import logging
 import os
-from typing import Any, Final
+from typing import Any, ClassVar, Final
 
-import orjson as oj
-from rich.console import Console
-from rich.logging import RichHandler
-from rich.traceback import install as rich_install
 
+# ANSI color codes for terminal output
+RESET: Final[str] = "\033[0m"
+BOLD: Final[str] = "\033[1m"
+DIM: Final[str] = "\033[2m"
+
+# Level colors (matches Python 3.13+ traceback style)
+DEBUG_COLOR: Final[str] = "\033[36m"     # Cyan
+INFO_COLOR: Final[str] = "\033[32m"      # Green
+WARNING_COLOR: Final[str] = "\033[33m"   # Yellow
+ERROR_COLOR: Final[str] = "\033[1;31m"   # Bold bright red (Python exception style)
+CRITICAL_COLOR: Final[str] = "\033[1;35m"  # Bold bright magenta (Python error span style)
+
+# Component colors
+TIMESTAMP_COLOR: Final[str] = "\033[90m"  # Bright black (gray)
+LOGGER_COLOR: Final[str] = "\033[94m"     # Bright blue
 
 DEFAULT_LOGGER_NAME: Final[str] = "openmcp"
 ENV_LOG_LEVEL: Final[str] = "OPENMCP_LOG_LEVEL"
 ENV_LOG_JSON: Final[str] = "OPENMCP_LOG_JSON"
-ENV_DISABLE_RICH: Final[str] = "OPENMCP_LOG_DISABLE_RICH"
-_LOGGER_CONFIGURED: bool = False
+ENV_NO_COLOR: Final[str] = "NO_COLOR"  # Standard env var for disabling colors
+DEFAULT_FORMAT: Final[str] = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+DEFAULT_DATEFMT: Final[str] = "%Y-%m-%d %H:%M:%S"
 
-rich_install(show_locals=False)
+JsonSerializer = Callable[[dict[str, Any]], str]
+PayloadTransformer = Callable[[dict[str, Any]], dict[str, Any]]
+
+_BUILTIN_RECORD_KEYS: set[str] = {
+    "name",
+    "msg",
+    "args",
+    "levelname",
+    "levelno",
+    "pathname",
+    "filename",
+    "module",
+    "exc_info",
+    "exc_text",
+    "stack_info",
+    "lineno",
+    "funcName",
+    "created",
+    "msecs",
+    "relativeCreated",
+    "thread",
+    "threadName",
+    "process",
+    "processName",
+    "task",
+    "taskName",
+    "context",
+    "message",
+    "asctime",
+}
 
 
-class StructuredFormatter(logging.Formatter):
+class ColoredFormatter(logging.Formatter):
+    """Formatter that adds ANSI colors to log output.
+
+    Override LEVEL_COLORS to customize colors for each log level.
+    """
+
+    LEVEL_COLORS: ClassVar[dict[str, str]] = {
+        "DEBUG": DEBUG_COLOR,
+        "INFO": INFO_COLOR,
+        "WARNING": WARNING_COLOR,
+        "ERROR": ERROR_COLOR,
+        "CRITICAL": CRITICAL_COLOR,
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        # Apply colors to components
+        levelname_color = self.LEVEL_COLORS.get(record.levelname, "")
+
+        # Save original values
+        orig_levelname = record.levelname
+        orig_name = record.name
+
+        # Colorize level and logger name
+        record.levelname = f"{levelname_color}{record.levelname}{RESET}"
+        record.name = f"{LOGGER_COLOR}{record.name}{RESET}"
+
+        # Format with parent formatter
+        result = super().format(record)
+
+        # Restore original values
+        record.levelname = orig_levelname
+        record.name = orig_name
+
+        return result
+
+
+class OpenMCPHandler(logging.StreamHandler):  # type: ignore[type-arg]
+    """StreamHandler subclass managed by OpenMCP.
+
+    Subclass this to customize behavior or override formatters.
+    """
+
+
+class StructuredJSONFormatter(logging.Formatter):
+    """Serialize log records into JSON using a user-provided serializer."""
+
+    def __init__(
+        self,
+        serializer: JsonSerializer,
+        *,
+        datefmt: str | None = None,
+        payload_transformer: PayloadTransformer | None = None,
+    ) -> None:
+        super().__init__(datefmt=datefmt)
+        self._serializer = serializer
+        self._transformer = payload_transformer or _default_payload_transformer
+
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
             "timestamp": self.formatTime(record, self.datefmt),
-            "level": record.levelname,
+            "level": record.levelname.lower(),
             "logger": record.name,
             "message": record.getMessage(),
-            "pid": record.process,
+            "process": record.process,
             "thread": record.thread,
         }
         if record.exc_info:
             payload["exc_info"] = self.formatException(record.exc_info)
 
-        builtin = {
-            "name",
-            "msg",
-            "args",
-            "levelname",
-            "levelno",
-            "pathname",
-            "filename",
-            "module",
-            "exc_info",
-            "exc_text",
-            "stack_info",
-            "lineno",
-            "funcName",
-            "created",
-            "msecs",
-            "relativeCreated",
-            "thread",
-            "threadName",
-            "process",
-            "processName",
-            "message",
-            "asctime",
-        }
-        context = {
-            key: value
-            for key, value in record.__dict__.items()
-            if key not in builtin and not key.startswith("_structured_")
-        }
-        if context:
-            payload["context"] = context
+        extra = {}
+        for key, value in record.__dict__.items():
+            if key == "context" and isinstance(value, dict):
+                extra.update(value)
+                continue
 
-        return oj.dumps(payload, default=self._default).decode("utf-8")
+            if key in _BUILTIN_RECORD_KEYS or key.startswith("_structured_"):
+                continue
 
-    @staticmethod
-    def _default(value: Any) -> Any:
-        if isinstance(value, set):
-            return sorted(value)
-        if isinstance(value, (bytes, bytearray)):
-            return value.decode(errors="replace")
-        return value
+            if key not in extra:
+                extra[key] = value
+        if extra:
+            payload["context"] = extra
+
+        transformed = self._transformer(payload)
+        return self._serializer(transformed)
 
 
-class _ConsoleSingleton:
-    _console: Console | None = None
+def _default_json_serializer(payload: dict[str, Any]) -> str:
+    return json.dumps(payload, ensure_ascii=False)
 
-    @classmethod
-    def get(cls) -> Console:
-        if cls._console is None:
-            cls._console = Console()
-        return cls._console
+
+def _default_payload_transformer(payload: dict[str, Any]) -> dict[str, Any]:
+    return payload
+
+
+def _has_openmcp_handler(root: logging.Logger) -> bool:
+    return any(isinstance(handler, OpenMCPHandler) for handler in root.handlers)
 
 
 def _read_bool_env(key: str) -> bool:
@@ -112,70 +183,120 @@ def _read_bool_env(key: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _resolve_log_level() -> int:
-    override = os.getenv(ENV_LOG_LEVEL)
-    if not override:
-        return logging.INFO
+def _resolve_level(level: int | str | None) -> int:
+    if level is None:
+        override = os.getenv(ENV_LOG_LEVEL)
+        if override:
+            level = override
+        else:
+            return logging.INFO
+
+    if isinstance(level, int):
+        return level
+
     try:
-        return getattr(logging, override.upper())
+        level_value: int = getattr(logging, str(level).upper())
     except AttributeError:
         return logging.INFO
+    else:
+        return level_value
 
 
-def _rich_handler(level: int) -> RichHandler:
-    handler = RichHandler(
-        console=_ConsoleSingleton.get(),
-        rich_tracebacks=True,
-        show_time=True,
-        show_path=True,
-        show_level=True,
-        markup=True,
-        log_time_format="%Y-%m-%d %H:%M:%S",
-    )
-    handler.setLevel(level)
-    return handler
+def setup_logger(
+    *,
+    level: int | str | None = None,
+    use_json: bool | None = None,
+    use_color: bool | None = None,
+    json_serializer: JsonSerializer | None = None,
+    payload_transformer: PayloadTransformer | None = None,
+    fmt: str | None = None,
+    datefmt: str | None = DEFAULT_DATEFMT,
+    force: bool = False,
+) -> None:
+    """Configure the root logger.
 
+    Args:
+        level: Override the log level. Falls back to ``OPENMCP_LOG_LEVEL`` then
+            ``logging.INFO``.
+        use_json: Enable JSON output. Defaults to ``OPENMCP_LOG_JSON`` when
+            ``None``.
+        use_color: Enable colored output. Defaults to ``True`` unless ``NO_COLOR``
+            env var is set or ``use_json=True``. Set explicitly to override.
+        json_serializer: Callable that converts the payload dict into a JSON
+            string. Useful for integrating faster serializers like ``orjson``
+            without adding dependencies.
+        payload_transformer: Callable that mutates the payload before
+            serialization, allowing structured models (e.g. Pydantic) to be
+            adapted.
+        fmt: Format string for plain-text logging.
+        datefmt: Date format for plain-text logging.
+        force: Reconfigure even if OpenMCP already attached its handler.
 
-def _json_handler(level: int) -> logging.Handler:
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-    handler.setFormatter(StructuredFormatter())
-    return handler
+    Returns:
+        None.
 
-
-def configure_logging(*, force: bool = False) -> None:
-    """Configure root logging with Rich + JSON handlers as needed."""
-    global _LOGGER_CONFIGURED
+    """
     root = logging.getLogger()
 
-    if root.handlers and not force:
+    # Skip reconfig if OpenMCP has already attached its handler
+    # unless caller explicitly requests a reset.
+    if _has_openmcp_handler(root) and not force:
         return
 
-    if force and root.handlers:
+    if force:
         for handler in list(root.handlers):
-            root.removeHandler(handler)
-            handler.close()
+            if isinstance(handler, OpenMCPHandler):
+                root.removeHandler(handler)
+                handler.close()
 
-    level = _resolve_log_level()
-    root.setLevel(level)
+    resolved_level = _resolve_level(level)
+    root.setLevel(resolved_level)
 
-    use_json = _read_bool_env(ENV_LOG_JSON)
-    disable_rich = _read_bool_env(ENV_DISABLE_RICH)
+    resolved_use_json = use_json if use_json is not None else _read_bool_env(ENV_LOG_JSON)
 
-    if not use_json and not disable_rich:
-        root.addHandler(_rich_handler(level))
-    if use_json:
-        root.addHandler(_json_handler(level))
-    if not root.handlers:
-        root.addHandler(_rich_handler(level))
+    # Determine color usage: explicit param > NO_COLOR env > default (True if not JSON)
+    if use_color is not None:
+        resolved_use_color = use_color
+    elif os.getenv(ENV_NO_COLOR):
+        resolved_use_color = False
+    else:
+        resolved_use_color = not resolved_use_json
 
-    _LOGGER_CONFIGURED = True
+    handler = OpenMCPHandler()
+    handler.setLevel(resolved_level)
+
+    formatter: logging.Formatter
+    if resolved_use_json:
+        serializer = json_serializer or _default_json_serializer
+        formatter = StructuredJSONFormatter(serializer, datefmt=datefmt, payload_transformer=payload_transformer)
+    elif resolved_use_color:
+        formatter = ColoredFormatter(fmt or DEFAULT_FORMAT, datefmt=datefmt)
+    else:
+        formatter = logging.Formatter(fmt or DEFAULT_FORMAT, datefmt=datefmt)
+
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
 
 
 def get_logger(name: str | None = None) -> logging.Logger:
-    if not _LOGGER_CONFIGURED:
-        configure_logging()
+    """Return a logger configured for OpenMCP usage.
+
+    Args:
+        name: Optional logger name. Defaults to ``DEFAULT_LOGGER_NAME``.
+
+    Returns:
+        ``logging.Logger`` configured with OpenMCP defaults.
+    """
+    root = logging.getLogger()
+    if not _has_openmcp_handler(root):
+        setup_logger()
     return logging.getLogger(name or DEFAULT_LOGGER_NAME)
 
-
-__all__ = ["configure_logging", "get_logger", "DEFAULT_LOGGER_NAME"]
+__all__ = [
+    "DEFAULT_LOGGER_NAME",
+    "ColoredFormatter",
+    "OpenMCPHandler",
+    "StructuredJSONFormatter",
+    "get_logger",
+    "setup_logger",
+]

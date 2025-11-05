@@ -10,7 +10,7 @@ Demonstrates how to handle elicitation/create requests from servers that need
 user input during tool execution. This example uses simple CLI prompts but
 could be adapted for GUI dialogs, web forms, etc.
 
-See: https://modelcontextprotocol.io/specification/2025-06-18/server/elicitation
+See: https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation
 See also: docs/openmcp/elicitation.md
 
 Run with:
@@ -108,7 +108,7 @@ async def main() -> None:
     )
 
     async with open_connection(
-        target=SERVER_URL,
+        url=SERVER_URL,
         transport="streamable-http",
         capabilities=capabilities,
     ) as client:

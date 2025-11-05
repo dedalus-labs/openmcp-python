@@ -12,6 +12,7 @@ assumes a Python virtual environment with the project’s dependencies installed
 | Authorization Stub | `examples/auth_stub/` | Shows how to enable `AuthorizationConfig` and provide a dummy token validator. |
 | Progress & Logging | `examples/progress_logging.py` | Uses `get_context()` to emit progress telemetry and structured log messages. |
 | Cancellation | `examples/cancellation.py` | Client-side cancellation using `MCPClient.cancel_request`. |
+| Dynamic Tools (Feature Flag) | `examples/advanced/feature_flag_server.py` | Demonstrates `allow_dynamic_tools=True` and mandatory list-change notifications. |
 
 Below are excerpts illustrating common patterns.
 

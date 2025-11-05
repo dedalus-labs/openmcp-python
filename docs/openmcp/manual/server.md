@@ -50,12 +50,25 @@ server = MCPServer(
 | `http_security`      | `TransportSecuritySettings | None`       | DNS rebinding protection on | Applies only to streamable HTTP transport. |
 | `authorization`      | `AuthorizationConfig | None`             | disabled | When enabled, serves PRM and enforces bearer tokens. |
 | `streamable_http_stateless` | `bool` | `False` | When `True`, each Streamable HTTP request is handled independently with no session tracking—useful for FaaS deployments. |
+| `allow_dynamic_tools` | `bool` | `False` | Enables runtime mutations of tools/prompts/resources. When `True`, you **must** emit the corresponding list-change notifications. |
 
 ### Notification Flags
 
 - `prompts_changed`, `resources_changed`, `tools_changed`: when set, the server advertises the ability
   to emit `notifications/.../list_changed`. Call `notify_prompts_list_changed()` / etc. after mutating
   registries.
+
+### Capability stability
+
+OpenMCP defaults to **static** capability lists: declare tools, prompts, and resources inside `with server.binding(): …` during startup and never mutate them at runtime. This yields deterministic contracts that enterprise clients rely on.
+
+Set `allow_dynamic_tools=True` to opt into **dynamic** mode. Dynamic servers may re-enter `server.binding()` after startup and mutate capability registries, but they **must**:
+
+1. Emit the appropriate list-change notification (`await server.notify_tools_list_changed()` / etc.).
+2. Communicate clearly with clients that the surface is fluid.
+3. Avoid surprises—wrap mutations behind feature flags, version your APIs, and document expected behaviour.
+
+Static mode raises an error if you attempt to mutate capabilities after `serve()` starts; dynamic mode allows it and logs warnings when you forget to notify clients.
 
 ## Capability Services
 
@@ -80,6 +93,8 @@ server = MCPServer(
   data (dicts, dataclasses, pydantic models, scalars).
 - Allow-/deny-lists: `server.allow_tools([...])` limits the exposed surface. Disabled tools remain
   registered and can be re-enabled later.
+- Runtime mutations require `allow_dynamic_tools=True` and a follow-up call to
+  `await server.notify_tools_list_changed()` so clients stay in sync.
 
 ### Resources & Templates
 
@@ -120,8 +135,13 @@ server = MCPServer(
 ### Transport Helpers
 
 - STDIO: `server.serve(transport="stdio")`
-- Streamable HTTP: `server.serve(host=..., port=..., path="/mcp")`
+- Streamable HTTP: `server.serve(transport="streamable-http", host=..., port=..., path="/mcp")`
+- Additional Uvicorn settings can be supplied via `uvicorn_options={"reload": True}`.
 - Custom transport: implement `BaseTransport` and call `server.register_transport(name, factory)`.
+
+All transport helpers log a single startup message through the server logger. Suppress it with
+`server.serve(verbose=False)` or the transport-specific `announce=False` parameter, or adjust
+verbosity via `openmcp.utils.logger.setup_logger()`.
 
 ## Operational Hooks
 

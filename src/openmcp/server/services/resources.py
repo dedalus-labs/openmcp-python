@@ -10,7 +10,7 @@ Implements the resources capability as specified in the Model Context Protocol:
 
 - https://modelcontextprotocol.io/specification/2025-06-18/server/resources
   (resources capability, list/read/subscribe operations, templates, notifications)
-- https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/pagination
+- https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination
   (cursor-based pagination for resources/list and templates/list)
 
 Manages resource registration, subscription lifecycle with session weak references,
@@ -30,6 +30,7 @@ from ... import types
 from ...context import context_scope
 from ...resource import ResourceSpec, extract_resource_spec
 from ...resource_template import ResourceTemplateSpec, extract_resource_template_spec
+from ...utils import maybe_await_with_args
 
 
 class ResourcesService:
@@ -78,34 +79,32 @@ class ResourcesService:
     # ------------------------------------------------------------------
 
     async def list_resources(self, request: types.ListResourcesRequest) -> types.ListResourcesResult:
-        cursor = request.params.cursor if request.params is not None else None
-        resources = list(self._resource_defs.values())
-        page, next_cursor = paginate_sequence(resources, cursor, limit=self._pagination_limit)
-        self.observers.remember_current_session()
-        return types.ListResourcesResult(resources=page, nextCursor=next_cursor)
+        with context_scope():
+            cursor = request.params.cursor if request.params is not None else None
+            resources = list(self._resource_defs.values())
+            page, next_cursor = paginate_sequence(resources, cursor, limit=self._pagination_limit)
+            self.observers.remember_current_session()
+            return types.ListResourcesResult(resources=page, nextCursor=next_cursor)
 
     async def list_templates(self, cursor: str | None) -> types.ListResourceTemplatesResult:
         page, next_cursor = paginate_sequence(self._resource_template_defs, cursor, limit=self._pagination_limit)
         return types.ListResourceTemplatesResult(resourceTemplates=page, nextCursor=next_cursor)
 
     async def read(self, uri: str) -> types.ReadResourceResult:
-        spec = self._resource_specs.get(uri)
-        if spec is None or uri not in self._resource_defs:
-            return types.ReadResourceResult(contents=[])
+        with context_scope():
+            spec = self._resource_specs.get(uri)
+            if spec is None or uri not in self._resource_defs:
+                return types.ReadResourceResult(contents=[])
 
-        try:
             try:
-                with context_scope():
-                    data = spec.fn()
-            except LookupError:
-                data = spec.fn()
-        except Exception as exc:  # pragma: no cover - defensive
-            text = f"Resource error: {exc}"
-            fallback = types.TextResourceContents(uri=uri, mimeType="text/plain", text=text)
-            return types.ReadResourceResult(contents=[fallback])
+                data = await maybe_await_with_args(spec.fn)
+            except Exception as exc:  # pragma: no cover - defensive
+                text = f"Resource error: {exc}"
+                fallback = types.TextResourceContents(uri=uri, mimeType="text/plain", text=text)
+                return types.ReadResourceResult(contents=[fallback])
 
-        normalized = normalize_resource_payload(uri, spec.mime_type, data)
-        return normalized
+            normalized = normalize_resource_payload(uri, spec.mime_type, data)
+            return normalized
 
     # ------------------------------------------------------------------
     # Subscriptions

@@ -14,9 +14,14 @@ requires (``docs/mcp/spec/schema-reference/resources-subscribe.md`` and
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any, Awaitable, Callable  # noqa: UP035
+
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from openmcp.server.transports.streamable_http import StreamableHTTPTransport
 
 import anyio
 import anyio.abc
@@ -123,9 +128,13 @@ async def test_stdio_subscription_end_to_end(monkeypatch: pytest.MonkeyPatch) ->
     async def start(server: MCPServer) -> None:
         await server.serve_stdio(raise_exceptions=True)
 
-    def patch_stdio(monkeypatch: pytest.MonkeyPatch, recv, send) -> None:
+    def patch_stdio(
+        monkeypatch: pytest.MonkeyPatch,
+        recv: Callable[[], Awaitable[object]],
+        send: Callable[[object], Awaitable[None]],
+    ) -> None:
         @asynccontextmanager
-        async def fake_stdio(*_: object, **__: object):
+        async def fake_stdio(*_: object, **__: object) -> AsyncIterator[tuple[Any, Any]]:
             yield recv, send
 
         monkeypatch.setattr("openmcp.server.transports.stdio.get_stdio_server", lambda: fake_stdio, raising=False)
@@ -137,7 +146,8 @@ async def test_stdio_subscription_end_to_end(monkeypatch: pytest.MonkeyPatch) ->
     assert before_updates == after_updates
 
     resources_cap = init_result.capabilities.resources
-    assert resources_cap and resources_cap.subscribe is True
+    assert resources_cap is not None
+    assert resources_cap.subscribe is True
     assert resources_cap.listChanged is True
 
     methods = [note.root.method for note in notifications]
@@ -150,22 +160,28 @@ async def test_streamable_http_subscription_end_to_end(monkeypatch: pytest.Monke
     async def start(server: MCPServer) -> None:
         await server.serve_streamable_http(host="127.0.0.1", port=3001, path="/mcp")
 
-    def patch_streamable_http(monkeypatch: pytest.MonkeyPatch, recv, send) -> None:
+    def patch_streamable_http(
+        monkeypatch: pytest.MonkeyPatch,
+        recv: Callable[[], Awaitable[object]],
+        send: Callable[[object], Awaitable[None]],
+    ) -> None:
         async def fake_run(
-            self,
+            self: StreamableHTTPTransport,
             *,
-            host: str,
-            port: int,
-            path: str,
-            log_level: str,
-            **uvicorn_options: object,
+            config: object | None = None,
+            **legacy_kwargs: object,
         ) -> None:
+            if config is not None:
+                uvicorn_options = dict(getattr(config, "uvicorn_options", {}))
+            else:
+                uvicorn_options = {key: legacy_kwargs[key] for key in legacy_kwargs if key not in {"host", "port", "path", "log_level"}}
+
             init_options = self._server.create_initialization_options()
             await self._server.run(
                 recv,
                 send,
                 init_options,
-                raise_exceptions=uvicorn_options.get("raise_exceptions", False),
+                raise_exceptions=bool(uvicorn_options.get("raise_exceptions", False)),
                 stateless=False,
             )
 
@@ -178,7 +194,8 @@ async def test_streamable_http_subscription_end_to_end(monkeypatch: pytest.Monke
     assert before_updates == after_updates
 
     resources_cap = init_result.capabilities.resources
-    assert resources_cap and resources_cap.subscribe is True
+    assert resources_cap is not None
+    assert resources_cap.subscribe is True
     assert resources_cap.listChanged is True
 
     methods = [note.root.method for note in notifications]

@@ -8,7 +8,7 @@
 
 Implements the sampling capability as specified in the Model Context Protocol:
 
-- https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+- https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
   (sampling capability, createMessage request for LLM interaction)
 
 Provides adapter interface for servers to handle client LLM sampling requests.
@@ -44,7 +44,7 @@ class _SessionState:
 class SamplingService:
     """Proxy for ``sampling/createMessage`` requests.
 
-    See: https://modelcontextprotocol.io/specification/2025-06-18/server/sampling
+        See: https://modelcontextprotocol.io/specification/2025-06-18/client/sampling
     """
 
     def __init__(self, *, timeout: float = DEFAULT_TIMEOUT, max_concurrent: int = MAX_CONCURRENT) -> None:

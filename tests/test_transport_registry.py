@@ -59,7 +59,7 @@ def test_http_security_override() -> None:
 
     transport = server._transport_for_name("streamable-http")  # noqa: SLF001
     assert isinstance(transport, StreamableHTTPTransport)
-    assert transport._security_settings is override  # noqa: SLF001
+    assert transport.security_settings is override
 
     server.configure_streamable_http_security(None)
     assert server._http_security_settings != override  # noqa: SLF001
