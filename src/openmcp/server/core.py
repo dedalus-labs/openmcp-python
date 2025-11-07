@@ -9,10 +9,11 @@
 from __future__ import annotations
 
 import base64
-from contextlib import contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import wraps
 import inspect
+import time
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Literal, Mapping
 
 import anyio
@@ -36,6 +37,8 @@ from mcp.server.lowlevel.server import NotificationOptions, Server, request_ctx
 from mcp.server.lowlevel.server import lifespan as default_lifespan
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import McpError
+from mcp.shared.context import RequestContext
+from mcp.shared.message import ServerMessageMetadata
 from mcp.shared.session import RequestResponder
 
 from .authorization import AuthorizationConfig, AuthorizationManager, AuthorizationProvider
@@ -80,12 +83,14 @@ from ..tool import ToolSpec
 from ..tool import reset_active_server as reset_tool_server
 from ..tool import set_active_server as set_tool_server
 from ..utils import get_logger
+from ..context import RUNTIME_CONTEXT_KEY, context_scope, get_context
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from anyio.abc import TaskGroup
     from mcp.server.models import InitializationOptions
     from mcp.server.session import ServerSession
+    from .resolver import ConnectionResolver
 
 TransportLiteral = Literal["stdio", "streamable-http"]
 
@@ -140,12 +145,19 @@ class MCPServer(Server[Any, Any]):
         authorization: AuthorizationConfig | None = None,
         streamable_http_stateless: bool = False,
         allow_dynamic_tools: bool = False,
+        resource_uri: str | None = None,
+        connector_kind: str | None = None,
+        connector_params: dict[str, type] | None = None,
+        auth_methods: list[str] | None = None,
     ) -> None:
         self._notification_flags = notification_flags or NotificationFlags()
         self._experimental_capabilities = {key: dict(value) for key, value in (experimental_capabilities or {}).items()}
+        self._base_lifespan = lifespan
+        self._connection_resolver: "ConnectionResolver" | None = None
         super().__init__(
             name, version=version, instructions=instructions, website_url=website_url, icons=icons, lifespan=lifespan
         )
+        self.lifespan = self._wrap_lifespan(self._base_lifespan)
         self._default_transport = transport.lower() if transport else "streamable-http"
         self._logger = get_logger(f"openmcp.server.{name}")
 
@@ -189,6 +201,12 @@ class MCPServer(Server[Any, Any]):
         self._runtime_started = False
         self._tool_mutation_pending_notification = False
         self._binding_depth = 0
+        self._active_transport: BaseTransport | None = None
+
+        self._resource_uri = resource_uri
+        self._connector_kind = connector_kind
+        self._connector_params = connector_params
+        self._auth_methods = auth_methods
 
         self._authorization_manager: AuthorizationManager | None = None
         if authorization and authorization.enabled:
@@ -295,6 +313,62 @@ class MCPServer(Server[Any, Any]):
     @property
     def prompt_names(self) -> list[str]:
         return self.prompts.names
+
+    @property
+    def resource_uri(self) -> str | None:
+        return self._resource_uri
+
+    @property
+    def connector_kind(self) -> str | None:
+        return self._connector_kind
+
+    @property
+    def connector_params(self) -> dict[str, type] | None:
+        return self._connector_params
+
+    @property
+    def auth_methods(self) -> list[str] | None:
+        return self._auth_methods
+
+    def get_mcp_metadata(self) -> dict[str, Any]:
+        """Return MCP connection metadata for .well-known/mcp-server.json.
+
+        Provides discovery information including connection schema, available tools,
+        and required authentication scopes according to the MCP connection schema
+        specification.
+        """
+        metadata: dict[str, Any] = {
+            "mcp_server_version": "2025-06-18",
+        }
+
+        if self._resource_uri:
+            metadata["resource_uri"] = self._resource_uri
+
+        if self._connector_kind or self._connector_params or self._auth_methods:
+            connector_schema: dict[str, Any] = {"version": "1"}
+
+            if self._connector_kind:
+                connector_schema["resource_kind"] = self._connector_kind
+
+            if self._connector_params:
+                params = {name: typ.__name__ for name, typ in self._connector_params.items()}
+                connector_schema["params"] = params
+
+            if self._auth_methods:
+                connector_schema["auth_supported"] = list(self._auth_methods)
+
+            metadata["connector_schema"] = connector_schema
+
+        tool_names = self.tools.tool_names
+        if tool_names:
+            metadata["tools"] = tool_names
+
+        if self._authorization_manager:
+            required_scopes = self._authorization_manager.get_required_scopes()
+            if required_scopes:
+                metadata["required_scopes"] = required_scopes
+
+        return metadata
 
     def active_sessions(self) -> tuple[ServerSession, ...]:
         """Return a snapshot of currently tracked client sessions."""
@@ -560,6 +634,17 @@ class MCPServer(Server[Any, Any]):
     def authorization_manager(self) -> AuthorizationManager | None:
         return self._authorization_manager
 
+    @property
+    def connection_resolver(self) -> "ConnectionResolver" | None:
+        """Return the configured connection resolver, if any."""
+
+        return self._connection_resolver
+
+    def set_connection_resolver(self, resolver: "ConnectionResolver" | None) -> None:
+        """Configure the resolver used by Context.resolve_client calls."""
+
+        self._connection_resolver = resolver
+
     def set_authorization_provider(self, provider: AuthorizationProvider) -> None:
         if self._authorization_manager is None:
             raise RuntimeError("Authorization is not enabled for this server")
@@ -596,6 +681,126 @@ class MCPServer(Server[Any, Any]):
                     "Tools were mutated in dynamic mode without emitting notifications/tools/list_changed. "
                     "Call notify_tools_list_changed() so clients can refresh their state."
                 )
+
+    def _wrap_lifespan(
+        self,
+        base_lifespan: Callable[[Server[Any, Any]], Any],
+    ) -> Callable[[Server[Any, Any]], Any]:
+        @asynccontextmanager
+        async def runtime_lifespan(server_ref: Server[Any, Any]) -> Any:
+            async with AsyncExitStack() as stack:
+                base_context = await stack.enter_async_context(base_lifespan(server_ref))
+                payload = self._compose_lifespan_payload(base_context)
+                try:
+                    yield payload
+                finally:
+                    if isinstance(payload, dict):
+                        payload.pop(RUNTIME_CONTEXT_KEY, None)
+
+        return runtime_lifespan
+
+    def _compose_lifespan_payload(self, base_context: Any) -> dict[str, Any]:
+        if base_context is None:
+            payload: dict[str, Any] = {}
+        elif isinstance(base_context, dict):
+            payload = base_context
+        elif isinstance(base_context, Mapping):
+            payload = dict(base_context)
+        else:
+            payload = {"_openmcp.base_context": base_context}
+
+        payload[RUNTIME_CONTEXT_KEY] = self._build_runtime_payload()
+        return payload
+
+    def _build_runtime_payload(self) -> dict[str, Any]:
+        return {
+            "server": self,
+            "resolver": self._connection_resolver,
+        }
+
+    async def _handle_request(
+        self,
+        message: RequestResponder[types.ClientRequest, types.ServerResult],
+        req: Any,
+        session: "ServerSession",
+        lifespan_context: Any,
+        raise_exceptions: bool,
+    ) -> None:
+        """Instrument requests to record wall-clock duration and structured metadata."""
+
+        start_ns = time.perf_counter_ns()
+        request_type = type(req).__name__
+        request_id = getattr(message, "request_id", None)
+        outcome = "ok"
+
+        handler = self.request_handlers.get(type(req))
+        dispatch_extra: dict[str, Any] = {"event": "mcp.request.dispatch", "request_type": request_type}
+        if request_id is not None:
+            dispatch_extra["request_id"] = request_id
+
+        try:
+            if handler is None:
+                outcome = "method_not_found"
+                await message.respond(
+                    types.ErrorData(
+                        code=types.METHOD_NOT_FOUND,
+                        message="Method not found",
+                    )
+                )
+                return
+
+            self._logger.debug("dispatching request", extra=dispatch_extra)
+
+            token = None
+            response: types.ServerResult | types.ErrorData | None = None
+            try:
+                request_data = None
+                metadata = message.message_metadata
+                if metadata is not None and isinstance(metadata, ServerMessageMetadata):
+                    request_data = metadata.request_context
+
+                token = request_ctx.set(
+                    RequestContext(
+                        message.request_id,
+                        message.request_meta,
+                        session,
+                        lifespan_context,
+                        request=request_data,
+                    )
+                )
+                response = await handler(req)
+            except McpError as err:
+                outcome = "error"
+                response = err.error
+            except anyio.get_cancelled_exc_class():
+                self._logger.info(
+                    "Request %s cancelled - duplicate response suppressed",
+                    message.request_id,
+                )
+                outcome = "cancelled"
+                return
+            except Exception as exc:
+                outcome = "exception"
+                if raise_exceptions:
+                    raise
+                response = types.ErrorData(code=0, message=str(exc), data=None)
+            finally:
+                if token is not None:
+                    request_ctx.reset(token)
+
+            if response is not None:
+                await message.respond(response)
+        finally:
+            duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+            timing_extra: dict[str, Any] = {
+                "event": "mcp.request.completed",
+                "request_type": request_type,
+                "request_outcome": outcome,
+                "duration_ms": duration_ms,
+            }
+            if request_id is not None:
+                timing_extra["request_id"] = request_id
+            self._logger.info("request completed", extra=timing_extra)
 
     # //////////////////////////////////////////////////////////////////
     # Transport registry
@@ -648,7 +853,7 @@ class MCPServer(Server[Any, Any]):
         if announce:
             mode = "stateless" if stateless else "stateful"
             self._logger.info("Serving %s via STDIO (%s)", self.name, mode)
-        await transport.run(raise_exceptions=raise_exceptions, stateless=stateless)
+        await self._run_transport(transport, raise_exceptions=raise_exceptions, stateless=stateless)
 
     async def serve(
         self,
@@ -716,7 +921,7 @@ class MCPServer(Server[Any, Any]):
                 transport_instance.transport_display_name,
             )
 
-        await transport_instance.run(**transport_kwargs)
+        await self._run_transport(transport_instance, **transport_kwargs)
 
     async def serve_streamable_http(
         self,
@@ -749,7 +954,20 @@ class MCPServer(Server[Any, Any]):
                 )
             else:
                 self._logger.info("Serving %s via Streamable HTTP at %s", self.name, base_url)
-        await transport.run(config=run_config)
+        await self._run_transport(transport, config=run_config)
+
+    async def _run_transport(self, transport: BaseTransport, **kwargs: Any) -> None:
+        self._active_transport = transport
+        try:
+            await transport.run(**kwargs)
+        finally:
+            self._active_transport = None
+
+    async def shutdown(self) -> None:
+        transport = self._active_transport
+        if transport is None:
+            return
+        await transport.stop()
 
     # //////////////////////////////////////////////////////////////////
     # Validation

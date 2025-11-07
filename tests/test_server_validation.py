@@ -24,6 +24,9 @@ class _StubTransport(BaseTransport):
     async def run(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
 
+    async def stop(self) -> None:
+        """Test stub implementation."""
+
 
 def test_validate_passes_with_default_services() -> None:
     server = MCPServer("validation-happy-path")

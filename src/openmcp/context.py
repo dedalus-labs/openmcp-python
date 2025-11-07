@@ -24,7 +24,7 @@ from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ._sdk_loader import ensure_sdk_importable
 
@@ -41,10 +41,13 @@ from .progress import progress as progress_manager
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.session import ServerSession
+    from .server.core import MCPServer
     from .server.dependencies.models import DependencyCall, ResolvedDependency
+    from .server.resolver import ConnectionResolver
 
 
 _CURRENT_CONTEXT: ContextVar[Context | None] = ContextVar("openmcp_current_context", default=None)
+RUNTIME_CONTEXT_KEY = "openmcp.runtime"
 
 
 def get_context() -> Context:
@@ -81,6 +84,7 @@ class Context:
 
     _request_context: RequestContext
     dependency_cache: dict["DependencyCall", "ResolvedDependency"] | None = None
+    runtime: Mapping[str, Any] | None = None
 
     # ------------------------------------------------------------------
     # Introspection helpers
@@ -95,6 +99,15 @@ class Context:
     def session(self) -> ServerSession:
         """Expose the underlying session for advanced scenarios."""
         return self._request_context.session
+
+    @property
+    def server(self) -> "MCPServer" | None:
+        """Return the MCP server associated with this request, if any."""
+
+        runtime = self.runtime
+        if not isinstance(runtime, Mapping):
+            return None
+        return cast("MCPServer | None", runtime.get("server"))
 
     @property
     def session_id(self) -> str | None:
@@ -121,6 +134,27 @@ class Context:
         """Return the progress token supplied by the client, if any."""
         meta = self._request_context.meta
         return None if meta is None else getattr(meta, "progressToken", None)
+
+    @property
+    def auth_context(self) -> Any | None:
+        """Return the authorization context populated by transports, if present."""
+
+        scope = self._request_scope()
+        if isinstance(scope, Mapping):
+            return scope.get("openmcp.auth")
+        return None
+
+    @property
+    def resolver(self) -> "ConnectionResolver" | None:
+        """Return the configured connection resolver for this server, if any."""
+
+        runtime = self.runtime
+        if not isinstance(runtime, Mapping):
+            return None
+        resolver = runtime.get("resolver")
+        if resolver is None:
+            return None
+        return cast("ConnectionResolver", resolver)
 
     # ------------------------------------------------------------------
     # Logging conveniences
@@ -186,6 +220,24 @@ class Context:
         """Return the coalescing progress context manager for this request."""
         return progress_manager(total=total, config=config, telemetry=telemetry)
 
+    async def resolve_client(
+        self,
+        handle: str,
+        *,
+        operation: Mapping[str, Any] | None = None,
+    ) -> Any:
+        """Resolve a connection handle into a driver client via the configured resolver."""
+
+        if not isinstance(handle, str):
+            raise TypeError("Connection handle must be a string identifier")
+
+        resolver = self.resolver
+        if resolver is None:
+            raise RuntimeError("Connection resolver is not configured for this server")
+
+        request_payload = self._build_resolver_context(operation)
+        return await resolver.resolve_client(handle, request_payload)
+
     # ------------------------------------------------------------------
     # Construction helpers
     # ------------------------------------------------------------------
@@ -193,7 +245,28 @@ class Context:
     @classmethod
     def from_request_context(cls, request_context: RequestContext) -> Context:
         """Build a :class:`Context` from the SDK request context."""
-        return cls(_request_context=request_context)
+        runtime_payload: Mapping[str, Any] | None = None
+        lifespan_context = request_context.lifespan_context
+        if isinstance(lifespan_context, Mapping):
+            candidate = lifespan_context.get(RUNTIME_CONTEXT_KEY)
+            if candidate is not None and isinstance(candidate, Mapping):
+                runtime_payload = cast(Mapping[str, Any], candidate)
+        return cls(_request_context=request_context, runtime=runtime_payload)
+
+    def _request_scope(self) -> Mapping[str, Any] | None:
+        request = getattr(self._request_context, "request", None)
+        if request is None:
+            return None
+        return getattr(request, "scope", None)
+
+    def _build_resolver_context(self, operation: Mapping[str, Any] | None) -> dict[str, Any]:
+        auth_context = self.auth_context
+        if auth_context is None:
+            raise RuntimeError("Authorization context missing; cannot resolve connection handle")
+        payload: dict[str, Any] = {"openmcp.auth": auth_context}
+        if operation is not None:
+            payload["operation"] = dict(operation)
+        return payload
 
 
 def _activate_request_context() -> Token[Context | None]:
@@ -227,4 +300,4 @@ def context_scope() -> Iterator[Context | None]:
         _reset_context(token)
 
 
-__all__ = ["Context", "get_context", "context_scope"]
+__all__ = ["Context", "RUNTIME_CONTEXT_KEY", "get_context", "context_scope"]

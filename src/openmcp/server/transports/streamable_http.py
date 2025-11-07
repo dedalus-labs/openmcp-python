@@ -12,10 +12,13 @@ from typing import TYPE_CHECKING
 
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from ._asgi import ASGITransportBase, ASGITransportConfig, SessionManagerHandler
+from .asgi import ASGITransportBase, ASGITransportConfig, SessionManagerHandler
 from ..._sdk_loader import ensure_sdk_importable
+
 
 
 ensure_sdk_importable()
@@ -46,7 +49,16 @@ class StreamableHTTPTransport(ASGITransportBase):
         return StreamableHTTPSessionManager(self.server, security_settings=security, stateless=self.stateless)
 
     def _build_routes(self, *, path: str, handler: SessionManagerHandler) -> Iterable[Route]:
-        return [Route(path, handler)]
+        routes = [Route(path, handler)]
+
+        async def metadata_endpoint(_request: Request) -> JSONResponse:
+            metadata = self.server.get_mcp_metadata()
+            headers = {"Cache-Control": "public, max-age=3600"}
+            return JSONResponse(metadata, headers=headers)
+
+        routes.append(Route("/.well-known/mcp-server.json", metadata_endpoint, methods=["GET"]))
+        return routes
+
 
 
 __all__ = ["StreamableHTTPTransport"]

@@ -16,8 +16,10 @@ the underlying ASGI server runtime.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import asyncio
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping  # noqa: TC003
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+import contextlib
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -115,6 +117,7 @@ class ASGITransportBase(BaseTransport, ABC):
     def __init__(self, server: MCPServer, *, config: ASGITransportConfig | None = None) -> None:
         super().__init__(server)
         self._config = config or ASGITransportConfig()
+        self._server_instance: Server | None = None
 
     @property
     def security_settings(self) -> object | None:
@@ -195,7 +198,18 @@ class ASGITransportBase(BaseTransport, ABC):
             **run_config.uvicorn_options,
         )
         server_instance = Server(uvicorn_config)
-        await server_instance.serve()
+        self._server_instance = server_instance
+        try:
+            await server_instance.serve()
+        finally:
+            self._server_instance = None
+
+    async def stop(self) -> None:
+        server_instance = self._server_instance
+        if server_instance is None:
+            return
+        server_instance.should_exit = True
+        await server_instance.shutdown()
 
     def _build_handler(self, manager: SessionManagerProtocol) -> SessionManagerHandler:
         """Construct the default ASGI handler for the provided session manager."""

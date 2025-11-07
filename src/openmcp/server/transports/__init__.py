@@ -12,7 +12,7 @@ applications can swap or extend them without touching the core server class.
 
 from __future__ import annotations
 
-from ._asgi import ASGIRunConfig, ASGITransportConfig
+from .asgi import ASGIRunConfig, ASGITransportConfig
 from .base import BaseTransport, TransportFactory
 from .stdio import StdioTransport
 from .streamable_http import StreamableHTTPTransport

@@ -1,0 +1,358 @@
+{
+  "$defs": {
+    "AdditionalAuthenticatedData": {
+      "additionalProperties": false,
+      "description": "Metadata captured for audit logging and correlation.",
+      "properties": {
+        "request_id": {
+          "description": "Server-side request identifier.",
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional tool name for audit readability.",
+          "title": "Tool"
+        },
+        "extra": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional structured metadata for analytics.",
+          "title": "Extra"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "title": "AdditionalAuthenticatedData",
+      "type": "object"
+    },
+    "ComputeHint": {
+      "additionalProperties": false,
+      "description": "Hints that steer execution runtime selection.",
+      "properties": {
+        "mode": {
+          "default": "stateless",
+          "description": "Stateless workloads map to short-lived compute (e.g. Lambda); stateful requires longer-lived containers.",
+          "enum": [
+            "stateless",
+            "stateful"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "enum": [
+                "bursty",
+                "durable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "High-level workload shape; bursty pairs with serverless, durable with provisioned compute.",
+          "title": "Profile"
+        },
+        "max_duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Upper bound on runtime before the task should abort.",
+          "title": "Max Duration Ms"
+        }
+      },
+      "title": "ComputeHint",
+      "type": "object"
+    },
+    "ConnectionReference": {
+      "additionalProperties": false,
+      "description": "Reference to a connection handle that the token authorised.",
+      "properties": {
+        "id": {
+          "description": "Connection handle identifier (e.g. ddls:conn_supabase_01H\u2026)",
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "auth_type": {
+          "description": "Authentication method (service_role_key, user_oauth_token, \u2026)",
+          "minLength": 1,
+          "title": "Auth Type",
+          "type": "string"
+        },
+        "fingerprint": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional fingerprint used to detect tampering.",
+          "title": "Fingerprint"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Metadata version for rolling connector updates.",
+          "title": "Version"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Scopes granted for this handle (parsed from the JWT claim).",
+          "title": "Scope"
+        }
+      },
+      "required": [
+        "id",
+        "auth_type"
+      ],
+      "title": "ConnectionReference",
+      "type": "object"
+    },
+    "TargetSpec": {
+      "additionalProperties": false,
+      "description": "Describes the upstream surface contacted by the execution backend.",
+      "properties": {
+        "kind": {
+          "description": "Target type: rest, graphql, sql, or service:<slug> for bespoke drivers.",
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "base": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Base URL (REST/GraphQL) or DSN / host identifier (SQL/custom).",
+          "title": "Base"
+        },
+        "resource": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Audience/resource URI used for downstream authorization decisions.",
+          "title": "Resource"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "TargetSpec",
+      "type": "object"
+    },
+    "WorkspaceHint": {
+      "additionalProperties": false,
+      "description": "Filesystem or storage requirements for execution.",
+      "properties": {
+        "type": {
+          "default": "ephemeral",
+          "description": "Ephemeral workspaces map to tmpfs/ephemeral storage; persistent uses mounted volumes (e.g. EFS).",
+          "enum": [
+            "ephemeral",
+            "persistent"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "size_mb": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Workspace size in megabytes.",
+          "title": "Size Mb"
+        },
+        "mount": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Desired mount point inside the execution container.",
+          "title": "Mount"
+        }
+      },
+      "title": "WorkspaceHint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Top-level execution plan consumed by the execution backend.",
+  "properties": {
+    "v": {
+      "const": 1,
+      "default": 1,
+      "description": "Plan schema version.",
+      "title": "V",
+      "type": "integer"
+    },
+    "slug": {
+      "description": "Marketplace/server identifier used for policy lookup.",
+      "minLength": 1,
+      "title": "Slug",
+      "type": "string"
+    },
+    "connection": {
+      "$ref": "#/$defs/ConnectionReference",
+      "description": "Handle metadata describing which secret to use."
+    },
+    "target": {
+      "$ref": "#/$defs/TargetSpec",
+      "description": "Upstream target details."
+    },
+    "op": {
+      "additionalProperties": true,
+      "description": "Driver-specific operation payload (REST/GraphQL/SQL/etc.).",
+      "title": "Op",
+      "type": "object"
+    },
+    "_mcp_user_credential": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Encrypted payload for user-delegated credentials (null for org secrets).",
+      "title": "Mcp User Credential"
+    },
+    "compute": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ComputeHint"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional compute/runtime hints."
+    },
+    "workspace": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkspaceHint"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional workspace requirements."
+    },
+    "aad": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AdditionalAuthenticatedData"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Authenticated metadata for auditing."
+    }
+  },
+  "required": [
+    "slug",
+    "connection",
+    "target",
+    "op"
+  ],
+  "title": "ExecutionPlan",
+  "type": "object"
+}

@@ -43,3 +43,6 @@ class StdioTransport(BaseTransport):
             await self.server.run(
                 read_stream, write_stream, init_options, raise_exceptions=raise_exceptions, stateless=stateless
             )
+
+    async def stop(self) -> None:
+        """Stop is a no-op for STDIO transport as lifecycle is managed by the context manager."""

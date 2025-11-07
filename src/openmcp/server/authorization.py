@@ -92,6 +92,10 @@ class AuthorizationManager:
     def set_provider(self, provider: AuthorizationProvider) -> None:
         self._provider = provider
 
+    def get_required_scopes(self) -> list[str]:
+        """Return the list of required scopes for this server."""
+        return list(self.config.required_scopes)
+
     # ------------------------------------------------------------------
     # Starlette integration helpers (lazy imports to avoid hard deps)
     # ------------------------------------------------------------------

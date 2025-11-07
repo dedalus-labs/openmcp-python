@@ -17,7 +17,7 @@ async def test_context_session_id_with_header(monkeypatch):
     # Mock request context with headers
     mock_request = py_types.SimpleNamespace(headers={"mcp-session-id": "test-session-123"})
     mock_request_context = py_types.SimpleNamespace(
-        request=mock_request, request_id="req-1", session=None, meta=None
+        request=mock_request, request_id="req-1", session=None, meta=None, lifespan_context={}
     )
 
     ctx = Context.from_request_context(mock_request_context)
@@ -29,7 +29,7 @@ async def test_context_session_id_without_header():
     """Context.session_id returns None when no mcp-session-id header present."""
     mock_request = py_types.SimpleNamespace(headers={})
     mock_request_context = py_types.SimpleNamespace(
-        request=mock_request, request_id="req-1", session=None, meta=None
+        request=mock_request, request_id="req-1", session=None, meta=None, lifespan_context={}
     )
 
     ctx = Context.from_request_context(mock_request_context)
@@ -39,7 +39,7 @@ async def test_context_session_id_without_header():
 @pytest.mark.anyio
 async def test_context_session_id_no_request():
     """Context.session_id returns None when request object doesn't exist."""
-    mock_request_context = py_types.SimpleNamespace(request_id="req-1", session=None, meta=None)
+    mock_request_context = py_types.SimpleNamespace(request_id="req-1", session=None, meta=None, lifespan_context={})
 
     ctx = Context.from_request_context(mock_request_context)
     assert ctx.session_id is None
@@ -50,7 +50,7 @@ async def test_context_session_id_no_headers():
     """Context.session_id returns None when headers attribute doesn't exist."""
     mock_request = py_types.SimpleNamespace()  # No headers attribute
     mock_request_context = py_types.SimpleNamespace(
-        request=mock_request, request_id="req-1", session=None, meta=None
+        request=mock_request, request_id="req-1", session=None, meta=None, lifespan_context={}
     )
 
     ctx = Context.from_request_context(mock_request_context)

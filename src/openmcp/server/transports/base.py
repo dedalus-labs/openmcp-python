@@ -66,6 +66,14 @@ class BaseTransport(ABC):
         normalized = primary.replace("_", " ").replace("-", " ")
         return normalized.title()
 
+    @abstractmethod
+    async def stop(self) -> None:
+        """Request the transport to stop accepting work.
+
+        Default implementation is a no-op so concrete transports can opt-in to
+        cooperative shutdown semantics.
+        """
+
 
 @runtime_checkable
 class TransportFactory(Protocol):

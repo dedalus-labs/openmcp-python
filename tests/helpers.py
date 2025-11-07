@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from itertools import count
+from types import SimpleNamespace
 
 import anyio
 from mcp.server.lowlevel.server import request_ctx
@@ -75,13 +76,21 @@ class RecordingSession(DummySession):
         )
 
 
-async def run_with_context(session: DummySession, func, *args, meta=None):
+async def run_with_context(
+    session: DummySession,
+    func,
+    *args,
+    meta=None,
+    request_scope: dict[str, object] | None = None,
+    lifespan_context: dict[str, object] | None = None,
+):
     """Execute *func* with ``request_ctx`` bound to *session*."""
     ctx = RequestContext(
         request_id=next(_REQUEST_COUNTER),
         meta=meta,
         session=session,  # type: ignore[arg-type]
-        lifespan_context={},
+        lifespan_context=lifespan_context or {},
+        request=SimpleNamespace(scope=request_scope) if request_scope is not None else None,
     )
     token = request_ctx.set(ctx)
     try:

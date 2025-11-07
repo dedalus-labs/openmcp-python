@@ -13,7 +13,7 @@ import pytest
 
 from openmcp.server import MCPServer
 from openmcp.server.transports import BaseTransport, StreamableHTTPTransport
-from openmcp.server.transports._asgi import SessionManagerHandler
+from openmcp.server.transports.asgi import SessionManagerHandler
 
 
 class DummyTransport(BaseTransport):
@@ -24,6 +24,9 @@ class DummyTransport(BaseTransport):
     async def run(self, **kwargs: Any) -> None:
         self.calls["called"] = True
         self.calls["kwargs"] = kwargs
+
+    async def stop(self) -> None:
+        """Test stub implementation."""
 
 
 @pytest.mark.anyio

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from .coro import maybe_await, maybe_await_with_args, noop_coroutine
 from .logger import get_logger, setup_logger
+from .serializer import to_json
 
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "noop_coroutine",
     "maybe_await",
     "maybe_await_with_args",
+    "to_json",
 ]

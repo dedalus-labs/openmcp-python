@@ -77,6 +77,24 @@ _BUILTIN_RECORD_KEYS: set[str] = {
 }
 
 
+def _append_duration_suffix(rendered: str, record: logging.LogRecord, *, colored: bool) -> str:
+    duration = getattr(record, "duration_ms", None)
+    if duration is None:
+        return rendered
+
+    try:
+        duration_value = float(duration)
+    except (TypeError, ValueError):
+        return rendered
+
+    suffix = f"[{duration_value:.2f} ms]"
+    if colored:
+        suffix = f" {DIM}{suffix}{RESET}"
+    else:
+        suffix = f" {suffix}"
+    return f"{rendered}{suffix}"
+
+
 class ColoredFormatter(logging.Formatter):
     """Formatter that adds ANSI colors to log output.
 
@@ -105,12 +123,21 @@ class ColoredFormatter(logging.Formatter):
 
         # Format with parent formatter
         result = super().format(record)
+        result = _append_duration_suffix(result, record, colored=True)
 
         # Restore original values
         record.levelname = orig_levelname
         record.name = orig_name
 
         return result
+
+
+class PlainFormatter(logging.Formatter):
+    """Formatter that mirrors the standard layout but appends request timings."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        result = super().format(record)
+        return _append_duration_suffix(result, record, colored=False)
 
 
 class OpenMCPHandler(logging.StreamHandler):  # type: ignore[type-arg]
@@ -272,7 +299,7 @@ def setup_logger(
     elif resolved_use_color:
         formatter = ColoredFormatter(fmt or DEFAULT_FORMAT, datefmt=datefmt)
     else:
-        formatter = logging.Formatter(fmt or DEFAULT_FORMAT, datefmt=datefmt)
+        formatter = PlainFormatter(fmt or DEFAULT_FORMAT, datefmt=datefmt)
 
     handler.setFormatter(formatter)
     root.addHandler(handler)
@@ -296,6 +323,7 @@ __all__ = [
     "DEFAULT_LOGGER_NAME",
     "ColoredFormatter",
     "OpenMCPHandler",
+    "PlainFormatter",
     "StructuredJSONFormatter",
     "get_logger",
     "setup_logger",

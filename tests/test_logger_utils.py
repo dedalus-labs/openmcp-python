@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from openmcp.utils.logger import StructuredJSONFormatter, get_logger, setup_logger
+from openmcp.utils.logger import ColoredFormatter, PlainFormatter, StructuredJSONFormatter, get_logger, setup_logger
 
 
 def _capture_logging(level: int, *, use_json: bool, **kwargs: Any) -> list[str]:
@@ -88,3 +88,23 @@ def test_payload_transformer_applied() -> None:
     assert len(lines) == 1
     payload = json.loads(lines[0])
     assert payload["context"] == {"transformed": {"value": 42}}
+
+
+def test_plain_formatter_appends_duration_suffix() -> None:
+    formatter = PlainFormatter("%(message)s")
+    record = logging.LogRecord("demo", logging.INFO, __file__, 0, "done", args=(), exc_info=None)
+    record.duration_ms = 12.3456
+
+    rendered = formatter.format(record)
+
+    assert rendered.endswith("[12.35 ms]")
+
+
+def test_colored_formatter_appends_duration_suffix() -> None:
+    formatter = ColoredFormatter("%(message)s")
+    record = logging.LogRecord("demo", logging.INFO, __file__, 0, "done", args=(), exc_info=None)
+    record.duration_ms = 7.0
+
+    rendered = formatter.format(record)
+
+    assert "[7.00 ms]" in rendered

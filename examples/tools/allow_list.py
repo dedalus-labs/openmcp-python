@@ -79,7 +79,7 @@ with server.binding():
         return "Access granted!"
 
 
-async def run_demo() -> None:
+async def demo() -> None:
     task = asyncio.create_task(
         server.serve(
             transport="streamable-http",
@@ -108,4 +108,9 @@ async def run_demo() -> None:
             await task
 
 if __name__ == "__main__":
-    asyncio.run(run_demo())
+    import sys
+    try:
+        asyncio.run(demo())
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received, exiting...")
+        sys.exit(0)

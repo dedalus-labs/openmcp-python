@@ -19,16 +19,20 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterable
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 import weakref
-
-import anyio
 from mcp.server.lowlevel.server import request_ctx
 from mcp.shared.exceptions import McpError
 
 from ..notifications import NotificationSink
 from ... import types
+
+try:  # pragma: no cover - optional dependency for trio backends
+    import trio
+except ImportError:  # pragma: no cover - trio not installed
+    trio = None
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mcp.server.session import ServerSession
@@ -50,7 +54,8 @@ class LoggingService:
     def __init__(self, logger, *, notification_sink: NotificationSink) -> None:
         self._logger = logger
         self._sink = notification_sink
-        self._lock = anyio.Lock()
+        self._asyncio_lock: asyncio.Lock | None = None
+        self._trio_lock: Any | None = None
         # Sessions are kept alive by the SDK; WeakKeyDictionary auto-cleans when sessions are garbage collected
         self._session_levels: weakref.WeakKeyDictionary[ServerSession, int] = weakref.WeakKeyDictionary()
         self._handler = _NotificationHandler(self)
@@ -66,7 +71,7 @@ class LoggingService:
         except LookupError:  # pragma: no cover - called outside request context
             return
 
-        async with self._lock:
+        async with self._acquire_lock():
             self._session_levels[context.session] = numeric
 
     async def emit(self, level: types.LoggingLevel, data: Any, logger_name: str | None = None) -> None:
@@ -116,7 +121,7 @@ class LoggingService:
     async def _broadcast(
         self, level: types.LoggingLevel, numeric_level: int, data: Any, logger_name: str | None
     ) -> None:
-        async with self._lock:
+        async with self._acquire_lock():
             targets = list(self._session_levels.items())
 
         if not targets:
@@ -139,9 +144,38 @@ class LoggingService:
         if not stale:
             return
 
-        async with self._lock:
+        async with self._acquire_lock():
             for session in stale:
                 self._session_levels.pop(session, None)
+
+    def _current_backend(self) -> str:
+        if trio is not None:
+            try:
+                trio.lowlevel.current_task()
+            except RuntimeError:
+                pass
+            else:
+                return "trio"
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return "none"
+        return "asyncio"
+
+    @contextlib.asynccontextmanager
+    async def _acquire_lock(self):
+        backend = self._current_backend()
+        if backend == "trio" and trio is not None:
+            if self._trio_lock is None:
+                self._trio_lock = trio.Lock()
+            async with self._trio_lock:
+                yield
+            return
+
+        if self._asyncio_lock is None:
+            self._asyncio_lock = asyncio.Lock()
+        async with self._asyncio_lock:
+            yield
 
 
 class _NotificationHandler(logging.Handler):
@@ -150,12 +184,18 @@ class _NotificationHandler(logging.Handler):
         self.service = service
 
     def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - indirectly tested
+        if trio is not None:
+            try:
+                token = trio.lowlevel.current_trio_token()
+            except RuntimeError:
+                token = None
+            else:
+                token.spawn_system_task(self.service.handle_log_record, record)
+                return
+
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            try:
-                anyio.from_thread.run(self.service.handle_log_record, record)
-            except RuntimeError:
-                return
+            return
         else:
             loop.create_task(self.service.handle_log_record(record))

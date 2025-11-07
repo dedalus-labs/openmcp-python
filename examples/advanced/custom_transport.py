@@ -88,6 +88,9 @@ class UnixSocketTransport(BaseTransport):
             self._server._logger.info(f"Listening on {socket_path}")
             await listener.serve(handle_connection)
 
+    async def stop(self) -> None:
+        """Stop is a no-op for Unix socket transport as lifecycle is managed by the listener context."""
+
 
 async def main() -> None:
     """Demonstrate custom transport registration and usage."""
