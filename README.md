@@ -34,11 +34,11 @@ OpenMCP wraps the official MCP reference SDK with ergonomic decorators, automati
 ## Installation
 
 ```bash
-# Install reference SDK
-uv pip install -e references/python-sdk
-
-# Or use your package manager
-pip install -e references/python-sdk
+# Install OpenMCP as an editable
+git clone https://github.com/dedalus-labs/openmcp-python
+cd openmcp-python
+uv pip install -e .  # Install as an editable
+uv pip show openmcp  # Should display a version
 ```
 
 ## Quickstart
